@@ -1,47 +1,145 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full bg-gray-50">
+<html lang="pt-BR" class="h-full bg-slate-50">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AI Response Quality Lab{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <style>
-    .nav-link { @apply text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium; }
-    .nav-active { @apply bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-medium; }
-    .btn-primary { @apply bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors; }
-    .btn-secondary { @apply bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg border border-gray-300 transition-colors; }
-    .btn-danger { @apply bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors; }
-    .card { @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6; }
-    .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium; }
-    .badge-green { @apply badge bg-green-100 text-green-800; }
-    .badge-yellow { @apply badge bg-yellow-100 text-yellow-800; }
-    .badge-red { @apply badge bg-red-100 text-red-800; }
-    .badge-gray { @apply badge bg-gray-100 text-gray-800; }
-    .badge-blue { @apply badge bg-blue-100 text-blue-800; }
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --line: #dbe3ea;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --brand: #0f766e;
+      --brand-dark: #115e59;
+    }
+    body {
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.10), transparent 28%),
+        radial-gradient(circle at top right, rgba(30, 41, 59, 0.08), transparent 30%),
+        var(--bg);
+    }
+    code, .font-mono {
+      font-family: "IBM Plex Mono", Consolas, monospace;
+    }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.5rem 0.85rem;
+      border-radius: 0.65rem;
+      font-size: 0.925rem;
+      font-weight: 500;
+      color: #cbd5e1;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .nav-link:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .btn-primary, .btn-secondary, .btn-danger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      border-radius: 0.75rem;
+      padding: 0.7rem 1rem;
+      font-weight: 600;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--brand);
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: var(--brand-dark);
+    }
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .btn-secondary:hover {
+      background: #f8fafc;
+    }
+    .btn-danger {
+      background: #dc2626;
+      color: #ffffff;
+    }
+    .btn-danger:hover {
+      background: #b91c1c;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid rgba(219, 227, 234, 0.95);
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+      padding: 1.5rem;
+      backdrop-filter: blur(8px);
+    }
+    .badge,
+    .badge-green,
+    .badge-yellow,
+    .badge-red,
+    .badge-gray,
+    .badge-blue {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border-radius: 9999px;
+      padding: 0.18rem 0.55rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .badge-gray { background: #e2e8f0; color: #334155; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .tooltip-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1rem;
+      height: 1rem;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 0.70rem;
+      cursor: help;
+      margin-left: 0.35rem;
+    }
   </style>
 </head>
 <body class="h-full">
-  <nav class="bg-gray-800 shadow-lg">
+  <nav class="bg-slate-950/95 shadow-lg backdrop-blur">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center">
           <div class="flex-shrink-0">
-            <a href="/" class="text-white font-bold text-lg tracking-tight">
-              🧪 AI Quality Lab
+            <a href="/" class="text-white font-semibold text-lg tracking-tight">
+              AI Response Quality Lab
             </a>
           </div>
           <div class="ml-10 flex items-baseline space-x-2">
-            <a href="/" class="nav-link">Dashboard</a>
+            <a href="/" class="nav-link">Painel</a>
             <a href="/datasets/" class="nav-link">Datasets</a>
             <a href="/runs/" class="nav-link">Experimentos</a>
             <a href="/runs/compare" class="nav-link">Comparar</a>
-            <a href="/safety/" class="nav-link">Safety</a>
+            <a href="/safety/" class="nav-link">Segurança</a>
             <a href="/settings/" class="nav-link">Configurações</a>
           </div>
         </div>
-        <div class="text-gray-400 text-xs">
-          MVP v0.1.0
+        <div class="text-slate-400 text-xs">
+          MVP local-first
         </div>
       </div>
     </div>
@@ -51,10 +149,9 @@
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="mt-16 border-t border-gray-200 py-6">
-    <div class="max-w-7xl mx-auto px-4 text-center text-gray-400 text-xs">
-      AI Response Quality Lab — sistema analítico/assistivo — impacto do erro: baixo a médio —
-      supervisão humana recomendada na interpretação dos resultados
+  <footer class="mt-16 border-t border-slate-200 py-6">
+    <div class="max-w-7xl mx-auto px-4 text-center text-slate-500 text-xs">
+      AI Response Quality Lab · analítico/assistivo · impacto do erro: baixo a médio · supervisão humana recomendável na interpretação dos resultados
     </div>
   </footer>
 </body>

@@ -66,6 +66,7 @@ class Dataset(SQLModel, table=True):
 
 class TestCase(SQLModel, table=True):
     __tablename__ = "test_cases"
+    __test__ = False
 
     id: Optional[int] = Field(default=None, primary_key=True)
     dataset_id: int = Field(foreign_key="datasets.id", index=True)
@@ -131,6 +132,8 @@ class ExperimentRun(SQLModel, table=True):
     temperature: float = 0.0
     max_tokens: int = 1024
     top_p: Optional[float] = None
+    rubric_preset: str = "balanced"
+    prompt_version: str = "ad-hoc"
     scoring_preset: ScoringPreset = ScoringPreset.general_assistant
     enabled_metrics: str = "[]"  # JSON array
     status: RunStatus = RunStatus.pending
@@ -160,6 +163,7 @@ class RunCaseResult(SQLModel, table=True):
     test_case_id: int = Field(foreign_key="test_cases.id", index=True)
     trace_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     final_prompt: Optional[str] = Field(default=None, sa_column=Column(Text))
+    prompt_version: str = "ad-hoc"
     response: Optional[str] = Field(default=None, sa_column=Column(Text))
     tokens_input: Optional[int] = None
     tokens_output: Optional[int] = None

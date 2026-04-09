@@ -1,54 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Configurações — AI Quality Lab{% endblock %}
+{% block title %}Configurações{% endblock %}
 {% block content %}
 <div class="mb-6">
   <h1 class="text-3xl font-bold text-gray-900">Configurações</h1>
-  <p class="text-gray-500 mt-1">Configuração da aplicação e providers</p>
+  <p class="text-gray-500 mt-1">Estado atual dos provedores, do judge e da observabilidade local.</p>
 </div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <!-- Config ativa -->
   <div class="card">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Configuração Ativa (.env)</h2>
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Configuração ativa (.env)</h2>
     <div class="space-y-2 text-sm">
-      <div class="flex justify-between"><span class="text-gray-500">Default Provider:</span><span class="font-mono">{{ config.default_provider }}</span></div>
-      <div class="flex justify-between"><span class="text-gray-500">Judge Provider:</span><span class="font-mono">{{ config.judge_provider }}/{{ config.judge_model }}</span></div>
-      <div class="flex justify-between"><span class="text-gray-500">OpenAI Key:</span><span class="font-mono">{{ "✓ configurada" if config.openai_api_key else "não configurada" }}</span></div>
-      <div class="flex justify-between"><span class="text-gray-500">Anthropic Key:</span><span class="font-mono">{{ "✓ configurada" if config.anthropic_api_key else "não configurada" }}</span></div>
-      <div class="flex justify-between"><span class="text-gray-500">OTEL Enabled:</span><span class="font-mono">{{ config.otel_enabled }}</span></div>
-      <div class="flex justify-between"><span class="text-gray-500">Log Level:</span><span class="font-mono">{{ config.log_level }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Provedor padrão:</span><span class="font-mono">{{ config.default_provider }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Judge configurado:</span><span class="font-mono">{{ config.judge_provider }}/{{ config.judge_model }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Rubrica padrão do judge:</span><span class="font-mono">{{ config.judge_rubric_default }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Chave OpenAI:</span><span class="font-mono">{{ "configurada" if config.openai_api_key else "não configurada" }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Base URL OpenAI:</span><span class="font-mono">{{ config.openai_base_url or "padrão" }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Chave Anthropic:</span><span class="font-mono">{{ "configurada" if config.anthropic_api_key else "não configurada" }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Ollama:</span><span class="font-mono">{{ config.ollama_base_url }} / {{ config.ollama_default_model }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">OpenTelemetry:</span><span class="font-mono">{{ config.otel_enabled }}</span></div>
+      <div class="flex justify-between"><span class="text-gray-500">Nível de log:</span><span class="font-mono">{{ config.log_level }}</span></div>
     </div>
     <div class="mt-4 text-xs text-gray-400 border-t pt-3">
-      Para alterar, edite o arquivo <code class="bg-gray-100 px-1 rounded">.env</code> e reinicie a aplicação.
+      Edite o arquivo <code class="bg-gray-100 px-1 rounded">.env</code> e reinicie a aplicação para alterar estas configurações.
     </div>
   </div>
 
-  <!-- Providers disponíveis -->
   <div class="card">
-    <h2 class="text-lg font-semibold text-gray-900 mb-4">Providers Disponíveis</h2>
-    {% for p in providers %}
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Provedores disponíveis</h2>
+    {% for provider in providers %}
     <div class="flex items-center gap-2 mb-2 text-sm">
-      <span class="w-2 h-2 rounded-full {{ 'bg-green-500' if (p == 'mock' or (p == 'openai' and config.openai_api_key) or (p == 'anthropic' and config.anthropic_api_key)) else 'bg-gray-300' }}"></span>
-      <span class="font-mono">{{ p }}</span>
-      {% if p == 'mock' %}<span class="text-gray-400 text-xs">(sempre disponível)</span>{% endif %}
-      {% if p == 'openai' and not config.openai_api_key %}<span class="text-yellow-500 text-xs">⚠ sem chave</span>{% endif %}
-      {% if p == 'anthropic' and not config.anthropic_api_key %}<span class="text-yellow-500 text-xs">⚠ sem chave</span>{% endif %}
+      <span class="w-2 h-2 rounded-full {{ 'bg-green-500' if (provider == 'mock' or provider == 'ollama' or (provider == 'openai' and config.openai_api_key) or (provider == 'anthropic' and config.anthropic_api_key)) else 'bg-gray-300' }}"></span>
+      <span class="font-mono">{{ provider }}</span>
+      {% if provider == 'mock' %}<span class="text-gray-400 text-xs">(sempre disponível)</span>{% endif %}
+      {% if provider == 'openai' and not config.openai_api_key %}<span class="text-yellow-500 text-xs">sem chave</span>{% endif %}
+      {% if provider == 'anthropic' and not config.anthropic_api_key %}<span class="text-yellow-500 text-xs">sem chave</span>{% endif %}
+      {% if provider == 'ollama' %}<span class="text-gray-400 text-xs">(local via {{ config.ollama_base_url }})</span>{% endif %}
     </div>
     {% endfor %}
   </div>
 </div>
 
-<!-- Classificação do sistema -->
 <div class="card mt-6">
-  <h2 class="text-lg font-semibold text-gray-900 mb-4">Classificação do Sistema</h2>
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Classificação do sistema</h2>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
     <div><span class="text-gray-500">Tipo:</span><br><strong>Analítico / Assistivo</strong></div>
-    <div><span class="text-gray-500">Impacto do erro:</span><br><strong>Baixo a Médio</strong></div>
+    <div><span class="text-gray-500">Impacto do erro:</span><br><strong>Baixo a médio</strong></div>
     <div><span class="text-gray-500">Autonomia:</span><br><strong>Sem autonomia operacional</strong></div>
     <div><span class="text-gray-500">PII:</span><br><strong>Não usa por padrão</strong></div>
-    <div><span class="text-gray-500">Tool Use:</span><br><strong>Somente leitura</strong></div>
+    <div><span class="text-gray-500">Tool use:</span><br><strong>Somente leitura</strong></div>
     <div><span class="text-gray-500">Supervisão:</span><br><strong class="text-yellow-600">Recomendável na interpretação</strong></div>
-    <div><span class="text-gray-500">Autenticação:</span><br><strong>Modo local — sem auth</strong></div>
+    <div><span class="text-gray-500">Autenticação:</span><br><strong>Modo local — sem autenticação</strong></div>
     <div><span class="text-gray-500">Versão:</span><br><strong>MVP v0.1.0</strong></div>
   </div>
 </div>

@@ -84,3 +84,64 @@ def test_delete_dataset(session):
     assert result is True
     assert svc.get_dataset(session, ds.id) is None
     assert svc.list_cases(session, ds.id) == []
+
+
+def test_export_jsonl_roundtrip_preserves_case_fields(session):
+    ds = svc.create_dataset(session, name="Dataset Exportavel", description="roundtrip")
+    svc.create_case(
+        session,
+        ds.id,
+        {
+            "name": "Caso exportado",
+            "category": "qa",
+            "user_input": "Explique o plano de contingencia.",
+            "system_prompt": "Responda em bullets.",
+            "expected_answer": "Plano com mitigacao e responsaveis.",
+            "retrieved_context": "Documento interno v2",
+            "reference_context": "Politica corporativa",
+            "expected_citations": '["Politica corporativa"]',
+            "metadata_json": '{"required_keywords":["mitigacao"]}',
+            "scenario_type": "rag_qa",
+            "severity": "medium",
+            "tags": ["roundtrip", "export"],
+        },
+    )
+
+    exported = svc.export_dataset_jsonl(session, ds.id)
+    ds_copy = svc.create_dataset(session, name="Dataset Reimportado")
+    imported, errors = svc.import_jsonl(session, ds_copy.id, exported)
+
+    assert imported == 1
+    assert errors == []
+
+    imported_case = svc.list_cases(session, ds_copy.id)[0]
+    assert imported_case.name == "Caso exportado"
+    assert imported_case.category == "qa"
+    assert imported_case.system_prompt == "Responda em bullets."
+    assert imported_case.retrieved_context == "Documento interno v2"
+    assert imported_case.reference_context == "Politica corporativa"
+    assert imported_case.expected_citations == '["Politica corporativa"]'
+    assert imported_case.get_tags() == ["roundtrip", "export"]
+    assert json.loads(imported_case.metadata_json)["required_keywords"] == ["mitigacao"]
+
+
+def test_export_csv_contains_expected_columns(session):
+    ds = svc.create_dataset(session, name="CSV Export")
+    svc.create_case(
+        session,
+        ds.id,
+        {
+            "name": "Caso CSV",
+            "user_input": "Retorne um JSON simples",
+            "expected_answer": '{"ok": true}',
+            "scenario_type": "extraction",
+            "severity": "low",
+        },
+    )
+
+    exported = svc.export_dataset_csv(session, ds.id)
+
+    assert "user_input" in exported
+    assert "expected_answer" in exported
+    assert "scenario_type" in exported
+    assert "Caso CSV" in exported

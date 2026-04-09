@@ -1,12 +1,51 @@
 {% extends "base.html" %}
-{% block title %}Experimentos — AI Quality Lab{% endblock %}
+{% block title %}Experimentos{% endblock %}
 {% block content %}
 <div class="flex items-center justify-between mb-8">
   <div>
     <h1 class="text-3xl font-bold text-gray-900">Experimentos</h1>
-    <p class="text-gray-500 mt-1">Histórico de runs de avaliação</p>
+    <p class="text-gray-500 mt-1">Histórico de execuções e filtros por dataset, modelo, categoria, severidade e tag.</p>
   </div>
-  <a href="/runs/new" class="btn-primary">+ Novo Experimento</a>
+  <a href="/runs/new" class="btn-primary">Novo experimento</a>
+</div>
+
+<div class="card mb-6">
+  <form method="get" action="/runs/" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Dataset</label>
+      <select name="dataset_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="">Todos</option>
+        {% for ds in datasets %}
+        <option value="{{ ds.id }}" {% if filters.dataset_id == ds.id %}selected{% endif %}>{{ ds.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Modelo</label>
+      <input type="text" name="model" value="{{ filters.model }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+      <input type="text" name="category" value="{{ filters.category }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Severidade</label>
+      <select name="severity" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        <option value="">Todas</option>
+        <option value="low" {% if filters.severity == "low" %}selected{% endif %}>Baixa</option>
+        <option value="medium" {% if filters.severity == "medium" %}selected{% endif %}>Média</option>
+        <option value="high" {% if filters.severity == "high" %}selected{% endif %}>Alta</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-600 mb-1">Tag</label>
+      <input type="text" name="tag" value="{{ filters.tag }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div class="md:col-span-5 flex gap-2">
+      <button type="submit" class="btn-secondary text-sm">Aplicar filtros</button>
+      <a href="/runs/" class="btn-secondary text-sm">Limpar</a>
+    </div>
+  </form>
 </div>
 
 {% if runs %}
@@ -17,25 +56,27 @@
         <th class="py-3 pr-4 font-medium text-gray-700">Nome</th>
         <th class="py-3 pr-4 font-medium text-gray-700">Dataset</th>
         <th class="py-3 pr-4 font-medium text-gray-700">Modelo</th>
+        <th class="py-3 pr-4 font-medium text-gray-700">Versão do prompt</th>
         <th class="py-3 pr-4 font-medium text-gray-700">Preset</th>
         <th class="py-3 pr-4 font-medium text-gray-700">Status</th>
-        <th class="py-3 font-medium text-gray-700">Criado</th>
+        <th class="py-3 font-medium text-gray-700">Criado em</th>
       </tr>
     </thead>
     <tbody>
       {% for run in runs %}
       <tr class="border-b border-gray-100 hover:bg-gray-50">
         <td class="py-3 pr-4">
-          <a href="/runs/{{ run.id }}" class="text-indigo-600 hover:text-indigo-800 font-medium">{{ run.name or "Run #" ~ run.id }}</a>
+          <a href="/runs/{{ run.id }}" class="text-teal-700 hover:text-teal-900 font-medium">{{ run.name or "Experimento #" ~ run.id }}</a>
         </td>
         <td class="py-3 pr-4 text-gray-600">{{ run._dataset.name if run._dataset else run.dataset_id }}</td>
         <td class="py-3 pr-4 font-mono text-xs text-gray-600">{{ run.provider }}/{{ run.model }}</td>
-        <td class="py-3 pr-4"><span class="badge-blue">{{ run.scoring_preset.value }}</span></td>
+        <td class="py-3 pr-4 font-mono text-xs text-gray-600">{{ run.prompt_version }}</td>
+        <td class="py-3 pr-4"><span class="badge-blue">{{ preset_label(run.scoring_preset.value) }}</span></td>
         <td class="py-3 pr-4">
-          {% if run.status.value == "completed" %}<span class="badge-green">✓ Concluído</span>
-          {% elif run.status.value == "running" %}<span class="badge-yellow">⏳ Executando</span>
-          {% elif run.status.value == "failed" %}<span class="badge-red">✗ Falhou</span>
-          {% else %}<span class="badge-gray">Pendente</span>{% endif %}
+          {% if run.status.value == "completed" %}<span class="badge-green">{{ status_label(run.status.value) }}</span>
+          {% elif run.status.value == "running" %}<span class="badge-yellow">{{ status_label(run.status.value) }}</span>
+          {% elif run.status.value == "failed" %}<span class="badge-red">{{ status_label(run.status.value) }}</span>
+          {% else %}<span class="badge-gray">{{ status_label(run.status.value) }}</span>{% endif %}
         </td>
         <td class="py-3 text-gray-400 text-xs">{{ run.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
       </tr>
@@ -45,8 +86,7 @@
 </div>
 {% else %}
 <div class="card text-center py-16">
-  <div class="text-5xl mb-4">🧪</div>
-  <p class="text-gray-500 text-lg">Nenhum experimento ainda.</p>
+  <p class="text-gray-500 text-lg">Nenhum experimento cadastrado ainda.</p>
   <a href="/runs/new" class="mt-6 inline-block btn-primary">Criar primeiro experimento</a>
 </div>
 {% endif %}

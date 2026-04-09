@@ -1,73 +1,146 @@
 {% extends "base.html" %}
-{% block title %}Safety Suite — AI Quality Lab{% endblock %}
+{% block title %}Segurança{% endblock %}
 {% block content %}
 <div class="mb-6">
-  <h1 class="text-3xl font-bold text-gray-900">Safety Suite</h1>
-  <p class="text-gray-500 mt-1">Resultados de testes adversariais e de segurança</p>
+  <h1 class="text-3xl font-bold text-gray-900">Segurança</h1>
+  <p class="text-gray-500 mt-1">Gerencie cenários adversariais e rode datasets de segurança já cadastrados.</p>
 </div>
 
-<!-- Executar suite -->
-<div class="card mb-6">
-  <h2 class="text-lg font-semibold text-gray-900 mb-3">Executar Suite Adversarial</h2>
-  <form action="/safety/run-suite" method="post" class="flex items-end gap-3">
-    <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">Provider</label>
-      <select name="provider" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
-        <option value="mock">mock</option>
-        <option value="openai">openai</option>
-        <option value="anthropic">anthropic</option>
-      </select>
-    </div>
-    <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">Modelo</label>
-      <input type="text" name="model" value="mock" class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-36">
-    </div>
-    <button type="submit" class="btn-primary">Executar Suite</button>
-  </form>
-</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+  <div class="card">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Executar dataset de segurança</h2>
+    <form action="/safety/run-suite" method="post" class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Dataset de segurança</label>
+        <select name="dataset_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">Suíte de Segurança Personalizada (ou padrão)</option>
+          {% for ds in safety_datasets %}
+          <option value="{{ ds.id }}">{{ ds.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Provedor</label>
+          <select name="provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {% for provider in providers %}
+            <option value="{{ provider }}">{{ provider }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Modelo</label>
+          <input type="text" name="model" value="gpt-oss:20b" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">Executar suíte de segurança</button>
+      <p class="text-xs text-gray-500">Para Ollama local, use <span class="font-mono">provider=ollama</span> com <span class="font-mono">model=gpt-oss:20b</span>.</p>
+    </form>
+  </div>
 
-<!-- Casos pré-definidos -->
-<div class="card mb-6">
-  <h2 class="text-lg font-semibold text-gray-900 mb-3">Casos Adversariais Pré-definidos</h2>
-  <div class="space-y-2">
-    {% for case in predefined_cases %}
-    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg text-sm">
-      <span class="badge-{{ 'red' if case.severity == 'high' else 'yellow' }}">{{ case.severity }}</span>
-      <span class="font-medium text-gray-800">{{ case.name }}</span>
-      <span class="text-gray-400 text-xs">tipo: {{ case.attack_type }}</span>
-      <span class="ml-auto text-gray-500 truncate max-w-xs" title="{{ case.user_input }}">{{ case.user_input[:60] }}…</span>
-    </div>
-    {% endfor %}
+  <div class="card">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Criar novo cenário adversarial</h2>
+    <form action="/safety/cases" method="post" class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Nome</label>
+        <input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Dataset</label>
+        <select name="dataset_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">Suíte de Segurança Personalizada</option>
+          {% for ds in safety_datasets %}
+          <option value="{{ ds.id }}">{{ ds.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Categoria</label>
+          <input type="text" name="category" value="custom" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Severidade</label>
+          <select name="severity" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {% for severity in severity_values %}
+            <option value="{{ severity }}">{{ severity_label(severity) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Prompt adversarial</label>
+        <textarea name="user_input" rows="4" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Resposta esperada (opcional)</label>
+        <textarea name="expected_answer" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Metadados JSON</label>
+        <textarea name="metadata_json" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{}</textarea>
+      </div>
+      <button type="submit" class="btn-primary">Salvar cenário</button>
+    </form>
   </div>
 </div>
 
-<!-- Resultados -->
+<div class="card mb-6">
+  <h2 class="text-lg font-semibold text-gray-900 mb-3">Cenários de segurança cadastrados</h2>
+  {% if safety_cases %}
+  <div class="space-y-3">
+    {% for case in safety_cases %}
+    <div class="border border-gray-200 rounded-lg p-4 flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <span class="font-medium text-gray-900">{{ case.name or "Caso #" ~ case.id }}</span>
+          <span class="badge-blue">{{ scenario_label(case.scenario_type.value) }}</span>
+          <span class="badge-{{ 'red' if case.severity.value == 'high' else ('yellow' if case.severity.value == 'medium' else 'gray') }}">{{ severity_label(case.severity.value) }}</span>
+        </div>
+        <div class="text-sm text-gray-700">{{ case.user_input[:220] }}{% if case.user_input | length > 220 %}…{% endif %}</div>
+        <div class="text-xs text-gray-400 mt-1">Dataset #{{ case.dataset_id }} · Categoria {{ case.category or "—" }}</div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="/datasets/{{ case.dataset_id }}/cases/{{ case.id }}" class="btn-secondary text-sm">Editar</a>
+        <form action="/safety/cases/{{ case.id }}/delete" method="post" onsubmit="return confirm('Remover este cenário de segurança?')">
+          <button class="btn-danger text-sm">Remover</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-8 text-gray-400">Nenhum cenário de segurança cadastrado ainda.</div>
+  {% endif %}
+</div>
+
 {% if results %}
 <div class="card">
-  <h2 class="text-lg font-semibold text-gray-900 mb-4">Resultados Registrados ({{ results | length }})</h2>
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Resultados recentes de segurança ({{ results | length }})</h2>
   {% set passed = results | selectattr("safety.passed", "eq", true) | list %}
   {% set failed = results | rejectattr("safety.passed", "eq", true) | list %}
   <div class="flex gap-4 mb-4 text-sm">
-    <span class="badge-green">✓ {{ passed | length }} passou</span>
-    <span class="badge-red">✗ {{ failed | length }} falhou</span>
+    <span class="badge-green">{{ passed | length }} passou</span>
+    <span class="badge-red">{{ failed | length }} falhou</span>
   </div>
   <div class="space-y-3">
     {% for item in results %}
     {% set sr = item.safety %}
     {% set result = item.result %}
     {% set run = item.run %}
+    {% set case = item.test_case %}
     <div class="border border-{{ 'green' if sr.passed else 'red' }}-200 rounded-lg p-4 bg-{{ 'green' if sr.passed else 'red' }}-50">
-      <div class="flex items-center gap-3 mb-2">
-        <span class="text-lg">{{ "✅" if sr.passed else "❌" }}</span>
-        <span class="font-medium text-gray-900">{{ sr.attack_type }}</span>
-        <span class="badge-{{ 'red' if sr.severity.value == 'high' else 'yellow' }}">{{ sr.severity.value }}</span>
-        {% if run %}<span class="text-xs text-gray-500">Run: {{ run.name or "#" ~ run.id }}</span>{% endif %}
+      <div class="flex flex-wrap items-center gap-3 mb-2">
+        <span class="font-medium text-gray-900">{{ case.name if case else sr.attack_type }}</span>
+        <span class="badge-{{ 'green' if sr.passed else 'red' }}">{{ "Passou" if sr.passed else "Falhou" }}</span>
+        <span class="badge-{{ 'red' if sr.severity.value == 'high' else 'yellow' }}">{{ severity_label(sr.severity.value) }}</span>
+        {% if run %}<span class="text-xs text-gray-500">Experimento: {{ run.name or "#" ~ run.id }}</span>{% endif %}
       </div>
       <p class="text-sm text-gray-700">{{ sr.explanation }}</p>
       {% if result and result.response %}
       <details class="mt-2">
-        <summary class="text-xs text-gray-500 cursor-pointer">Ver resposta do modelo ▾</summary>
-        <div class="mt-1 bg-white rounded p-2 text-xs text-gray-700 max-h-24 overflow-y-auto">{{ result.response }}</div>
+        <summary class="text-xs text-gray-500 cursor-pointer">Ver resposta do modelo</summary>
+        <div class="mt-1 bg-white rounded p-2 text-xs text-gray-700 max-h-24 overflow-y-auto whitespace-pre-wrap">{{ result.response }}</div>
       </details>
       {% endif %}
     </div>
@@ -76,8 +149,7 @@
 </div>
 {% else %}
 <div class="card text-center py-12 text-gray-400">
-  <div class="text-4xl mb-3">🛡️</div>
-  <p>Nenhum resultado safety ainda. Execute a suite acima.</p>
+  <p>Nenhum resultado de segurança registrado ainda.</p>
 </div>
 {% endif %}
 {% endblock %}

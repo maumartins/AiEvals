@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Caso de Teste{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <a href="/datasets/{{ dataset.id }}" class="text-teal-700 hover:text-teal-900 text-sm">← Voltar ao dataset</a>
+  <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ case.name or "Caso #" ~ case.id }}</h1>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="card lg:col-span-2">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Editar caso</h2>
+    <form action="/datasets/{{ dataset.id }}/cases/{{ case.id }}" method="post" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Nome</label>
+          <input type="text" name="name" value="{{ case.name }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Categoria</label>
+          <input type="text" name="category" value="{{ case.category }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Cenário</label>
+          <select name="scenario_type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {% for scenario in scenario_values %}
+            <option value="{{ scenario }}" {% if case.scenario_type.value == scenario %}selected{% endif %}>{{ scenario_label(scenario) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Severidade</label>
+          <select name="severity" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {% for severity in severity_values %}
+            <option value="{{ severity }}" {% if case.severity.value == severity %}selected{% endif %}>{{ severity_label(severity) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Pergunta / Entrada</label>
+        <textarea name="user_input" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ case.user_input }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Prompt de sistema</label>
+        <textarea name="system_prompt" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ case.system_prompt or "" }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Resposta esperada</label>
+        <textarea name="expected_answer" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ case.expected_answer or "" }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Contexto recuperado</label>
+        <textarea name="retrieved_context" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ case.retrieved_context or "" }}</textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Contexto de referência</label>
+        <textarea name="reference_context" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ case.reference_context or "" }}</textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Citações esperadas</label>
+          <input type="text" name="expected_citations" value="{{ case.expected_citations or '' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Tags</label>
+          <input type="text" name="tags" value="{{ case.tags or '' }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Metadata JSON</label>
+        <textarea name="metadata_json" rows="5" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ case.metadata_json }}</textarea>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button type="submit" class="btn-primary">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Resumo</h2>
+    <div class="space-y-2 text-sm">
+      <div><span class="text-gray-500">Dataset:</span><br><strong>{{ dataset.name }}</strong></div>
+      <div><span class="text-gray-500">Cenário:</span><br><strong>{{ scenario_label(case.scenario_type.value) }}</strong></div>
+      <div><span class="text-gray-500">Severidade:</span><br><strong>{{ severity_label(case.severity.value) }}</strong></div>
+      <div><span class="text-gray-500">Criado em:</span><br><strong>{{ case.created_at.strftime('%d/%m/%Y %H:%M') }}</strong></div>
+    </div>
+    <form action="/datasets/{{ dataset.id }}/cases/{{ case.id }}/delete" method="post" class="mt-6" onsubmit="return confirm('Remover este caso de teste?')">
+      <button class="btn-danger w-full">Remover caso</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

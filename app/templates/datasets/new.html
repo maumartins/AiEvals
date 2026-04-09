@@ -2,25 +2,25 @@
 {% block title %}Novo Dataset{% endblock %}
 {% block content %}
 <div class="mb-6">
-  <a href="/datasets/" class="text-indigo-600 hover:text-indigo-800 text-sm">← Voltar</a>
-  <h1 class="text-3xl font-bold text-gray-900 mt-2">Novo Dataset</h1>
+  <a href="/datasets/" class="text-teal-700 hover:text-teal-900 text-sm">← Voltar</a>
+  <h1 class="text-3xl font-bold text-gray-900 mt-2">Novo dataset</h1>
 </div>
 
 <div class="card max-w-xl">
   <form action="/datasets/" method="post" class="space-y-4">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-      <input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+      <input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
     </div>
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-      <input type="text" name="category" placeholder="ex: geral, rag, safety" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+      <input type="text" name="category" placeholder="Ex.: geral, rag, segurança" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
     </div>
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-      <textarea name="description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+      <textarea name="description" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
     </div>
-    <button type="submit" class="btn-primary w-full">Criar Dataset</button>
+    <button type="submit" class="btn-primary w-full">Criar dataset</button>
   </form>
 </div>
 {% endblock %}

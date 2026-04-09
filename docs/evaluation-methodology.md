@@ -1,89 +1,130 @@
-# Metodologia de Avaliação
+# Metodologia de Avaliacao
 
-## Princípios
+## Principios
 
-1. **Sem score mágico único**: métricas são mostradas individualmente por padrão
-2. **Transparência sobre o que foi calculado**: COMPUTED / SKIPPED / FAILED são sempre exibidos
-3. **Score composto é opcional**: configurável por preset, ignora SKIPs em vez de zerá-los
-4. **Métricas por cenário**: `json_validity` só faz sentido em `extraction`; `faithfulness` só em RAG
-5. **Judge não é verdade**: o LLM-as-judge é referência qualitativa, não autoridade
+1. Sem score magico unico por padrao.
+2. Metricas por cenario e por risco.
+3. Transparencia sobre `COMPUTED`, `SKIPPED` e `FAILED`.
+4. Judge model e referencia qualitativa, nao verdade absoluta.
+5. Fallback explicito quando faltar dependencia ou contexto.
 
-## Famílias de Métricas
+## Familias de metricas
 
-### A — Determinísticas
+### Deterministicas
 
-Calculadas sem dependência externa. Sempre disponíveis.
+Usadas para verificar atributos objetivos do output:
 
-| Métrica | Range | Interpretação |
-|---------|-------|---------------|
-| `latency_ms` | 0–∞ ms | Menor é melhor |
-| `latency_score` | 0–1 | 1 = <500ms, 0 = >5000ms |
-| `cost_usd` | 0–∞ | Custo em USD (estimado) |
-| `is_empty_response` | 0 ou 1 | 1 = resposta vazia (ruim) |
-| `json_validity` | 0 ou 1 | 1 = JSON válido encontrado |
-| `citation_coverage` | 0–1 | Fração de citações esperadas presentes |
-| `structural_completeness` | 0–1 | Heurística de completude |
-| `length_adequacy` | 0–1 | Adequação do comprimento ao cenário |
+- latencia
+- custo
+- tamanho da resposta
+- resposta vazia
+- validade JSON
+- presenca de citacoes
+- completude estrutural
+- adequacao de comprimento
+- aderencia a regras de keyword
+- aderencia a regex
 
-### B — Com Referência
+### Com referencia
 
-Requerem `expected_answer`. Se ausente: SKIPPED.
+Requerem `expected_answer` e opcionalmente `reference_context`:
 
-| Métrica | Dependência | Interpretação |
-|---------|-------------|---------------|
-| `semantic_similarity` | sentence-transformers ou fallback léxico | 1 = idêntico semanticamente |
-| `lexical_overlap` | built-in (Jaccard) | Overlap de tokens |
-| `topic_coverage` | built-in | Fração de tópicos-chave cobertos |
-| `critical_divergence` | built-in | 0 = divergência crítica detectada |
+- similaridade semantica
+- overlap lexical
+- factual correctness aproximada
+- topic coverage
+- critical divergence
 
-### C — RAG / Grounding
+### RAG / grounding
 
-Requerem `retrieved_context`. Se ausente: SKIPPED.
+Requerem `retrieved_context`:
 
-| Métrica | Fonte | Interpretação |
-|---------|-------|---------------|
-| `faithfulness` | Ragas ou fallback | Respostas suportadas pelo contexto |
-| `answer_relevancy` | Ragas ou fallback | Relevância da resposta para a pergunta |
-| `context_precision` | Ragas ou fallback | Fração do contexto relevante à pergunta |
-| `context_recall` | Ragas (requer expected_answer) | Cobertura do contexto sobre a referência |
-| `groundedness` | fallback | Heurística de ancoragem no contexto |
+- faithfulness
+- answer_relevancy
+- context_precision
+- context_recall
+- groundedness
 
-### D — LLM-as-Judge
+Quando Ragas estiver instalado, o laboratorio usa Ragas. Sem Ragas, cai para fallback lexical e explicita isso em `details`.
 
-Rubrica explícita 1-5. Configurável.
+### Judge
 
-| Dimensão | O que avalia |
-|----------|-------------|
-| `correctness` | Precisão factual |
-| `completeness` | Abrangência da resposta |
-| `clarity` | Clareza e legibilidade |
-| `helpfulness` | Utilidade para o usuário |
-| `safety` | Segurança e conformidade ética |
-| `instruction_following` | Seguimento de formato/instruções |
+Rubricas 1-5:
 
-O prompt do judge é salvo por execução para auditoria.
+- correctness
+- completeness
+- clarity
+- helpfulness
+- safety
+- instruction_following
 
-### E — Safety
+Rubric presets disponiveis:
 
-Baseada em padrões regex. Para cenário `safety_adversarial`.
+- `balanced`
+- `strict_grounded`
+- `safety_first`
+- `structured_output`
 
-| Resultado | Significado |
-|-----------|-------------|
-| `passed=True` | Modelo recusou ou não vazou informação |
-| `passed=False` | Modelo produziu conteúdo inseguro ou vazou contexto |
+### Safety
 
-## Presets de Score Composto
+Avalia cenarios adversariais como:
 
-| Preset | Métricas com maior peso |
-|--------|------------------------|
-| `general_assistant` | correctness (25%), completeness (20%), helpfulness (20%) |
-| `rag_grounded_qa` | faithfulness (30%), groundedness (20%), context_recall (20%) |
-| `safety_first` | safety (50%), correctness (20%), instruction_following (20%) |
-| `extraction_structured` | json_validity (35%), correctness (25%) |
+- prompt injection
+- ignorar instrucoes
+- extracao de system prompt
+- bypass de policy
+- refusal quality
+- vazamento basico de email, telefone e API key
 
-## Limitações conhecidas
+## Quando cada metrica faz sentido
 
-- Fallback léxico é menos preciso que embeddings — declare isso ao reportar resultados
-- Judge tem viés de posição e verbosidade — resultados longos podem ter scores inflados
-- Safety suite via regex não substitui red-teaming manual
-- `context_recall` requer Ragas E `expected_answer` — frequentemente SKIPPED
+### general_qa
+
+- judge
+- semantic_similarity
+- factual_correctness
+- topic_coverage
+
+### rag_qa
+
+- faithfulness
+- groundedness
+- context_precision
+- context_recall
+- judge com preset mais estrito
+
+### extraction
+
+- json_validity
+- regex_rule_adherence
+- keyword_rule_adherence
+- instruction_following
+
+### safety_adversarial
+
+- safety_suite_pass
+- judge safety
+- explicacao adversarial por caso
+
+## Composite score
+
+O score composto:
+
+- e calculado por preset
+- ignora metricas `SKIPPED`
+- usa apenas metricas presentes
+- existe para comparacao, nao para substituicao de analise
+
+Presets:
+
+- `general_assistant`
+- `rag_grounded_qa`
+- `safety_first`
+- `extraction_structured`
+
+## Limitacoes
+
+- Heuristicas lexicais nao equivalem a verificacao factual robusta.
+- Judge LLM tende a sofrer vies por estilo, verbosity e alinhamento do proprio modelo.
+- Safety via regex nao cobre todos os ataques indiretos.
+- `context_recall` depende de formato de caso compativel.

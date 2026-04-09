@@ -121,3 +121,21 @@ class TestComputeMetrics:
         metrics = compute_deterministic_metrics(case, result)
         citation_metric = next(m for m in metrics if m["name"] == "citation_coverage")
         assert citation_metric["status"] == "skipped"
+
+    def test_keyword_rule_adherence_uses_metadata(self):
+        case = make_case()
+        case.metadata_json = '{"required_keywords":["Brasilia"],"forbidden_keywords":["Rio"]}'
+        result = make_result(response="Brasilia e a capital do Brasil.")
+        metrics = compute_deterministic_metrics(case, result)
+        keyword_metric = next(m for m in metrics if m["name"] == "keyword_rule_adherence")
+        assert keyword_metric["status"] == "computed"
+        assert keyword_metric["value"] == 1.0
+
+    def test_regex_rule_adherence_uses_metadata(self):
+        case = make_case(scenario_type=ScenarioType.extraction)
+        case.metadata_json = '{"regex_must_match":["\\"campo\\"\\\\s*:"],"response_format":"json"}'
+        result = make_result(response='{"campo":"valor"}')
+        metrics = compute_deterministic_metrics(case, result)
+        regex_metric = next(m for m in metrics if m["name"] == "regex_rule_adherence")
+        assert regex_metric["status"] == "computed"
+        assert regex_metric["value"] == 1.0

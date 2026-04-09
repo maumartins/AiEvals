@@ -7,12 +7,13 @@ from app.models.entities import MetricScore
 # Pesos por preset (metric_name → weight)
 PRESET_WEIGHTS: dict[str, dict[str, float]] = {
     "general_assistant": {
-        "correctness": 0.25,
+        "correctness": 0.20,
         "completeness": 0.20,
         "clarity": 0.15,
         "helpfulness": 0.20,
         "instruction_following": 0.10,
-        "semantic_similarity": 0.10,
+        "semantic_similarity": 0.05,
+        "factual_correctness": 0.10,
     },
     "rag_grounded_qa": {
         "faithfulness": 0.30,
@@ -31,7 +32,8 @@ PRESET_WEIGHTS: dict[str, dict[str, float]] = {
         "json_validity": 0.35,
         "correctness": 0.25,
         "completeness": 0.20,
-        "instruction_following": 0.20,
+        "instruction_following": 0.10,
+        "regex_rule_adherence": 0.10,
     },
 }
 

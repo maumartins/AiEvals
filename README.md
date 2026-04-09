@@ -1,144 +1,204 @@
 # AI Response Quality Lab
 
-Laboratório experimental para avaliar a qualidade de respostas de modelos de IA usando múltiplas técnicas, sem depender de um único score ou judge model.
+Laboratorio local-first para avaliar qualidade de respostas de IA sem colapsar tudo em uma unica nota. O MVP cadastra datasets, executa experimentos contra providers LLM, registra rastros operacionais e aplica multiplas familias de metricas com transparencia sobre `COMPUTED`, `SKIPPED` e `FAILED`.
 
-## Por que esta arquitetura foi escolhida
+## Classificacao do sistema
 
-- **Monolito FastAPI + SQLite**: menor complexidade suficiente para um laboratório local. Sem microserviços, sem filas, sem Redis.
-- **Jinja2 + HTMX**: UI server-rendered, sem SPA pesada, com interatividade assíncrona via HTMX.
-- **SQLModel**: combina SQLAlchemy + Pydantic em uma interface limpa, reduzindo duplicação.
-- **Provider mock**: a app funciona sem nenhuma API key, usando dados e respostas simuladas.
+- Tipo: analitico / assistivo
+- Impacto do erro: baixo a medio
+- Autonomia: sem autonomia operacional
+- PII: nao usar por padrao; redaction basica em logs
+- Tool use: somente leitura
+- Supervisao humana: recomendavel na interpretacao dos resultados
 
-## Classificação do sistema
+## Por que esta arquitetura
 
-| Dimensão | Valor |
-|----------|-------|
-| Tipo | Analítico / Assistivo |
-| Impacto do erro | Baixo a Médio |
-| Autonomia | Sem autonomia operacional |
-| PII | Não usa por padrão; redaction básica em logs |
-| Tool Use | Somente leitura |
-| Supervisão humana | Recomendável na interpretação dos resultados |
+- Monolito FastAPI + SQLite: menor complexidade suficiente para um laboratorio local.
+- Jinja2 + HTMX + Tailwind CDN: UI SSR simples, sem SPA separada.
+- SQLModel: dados tipados com baixo overhead.
+- Providers desacoplados e seed mock: a aplicacao funciona mesmo sem chaves reais.
+- Observabilidade local com OpenTelemetry: spans basicos para generation, judge, rag e safety.
+
+Nao ha microservicos, filas externas, Redis, Kafka ou arquitetura event-driven.
+
+## O que o MVP entrega
+
+- Cadastro e importacao de datasets em CSV e JSONL.
+- Casos de teste com `expected_answer`, `retrieved_context`, `reference_context`, `expected_citations`, `metadata_json`, `severity` e `scenario_type`.
+- Execucao de experimentos com `provider`, `model`, `temperature`, `max_tokens`, `top_p`, `prompt template`, `prompt_version`, `rubric_preset` e familias de metricas habilitadas.
+- Providers: `mock`, `openai`, `anthropic` e `ollama`.
+- Suporte local a Ollama com `gpt-oss:20b`.
+- Dashboard com total de runs, sucesso/falha, custo medio, latencia media, medias por modelo e comparativo por versao de prompt.
+- Safety suite com prompt injection, bypass, system prompt extraction, refusal quality e leakage basico.
+
+## Metricas disponiveis
+
+### A. Deterministicas / estruturais
+
+- `latency_ms`
+- `latency_score`
+- `cost_usd`
+- `response_length_chars`
+- `is_empty_response`
+- `json_validity`
+- `citation_coverage`
+- `structural_completeness`
+- `length_adequacy`
+- `keyword_rule_adherence`
+- `regex_rule_adherence`
+
+Use quando voce precisa validar formato, custo, tempo, resposta vazia, regras configuraveis por metadata e conformidade basica.
+
+### B. Com referencia
+
+- `semantic_similarity`
+- `lexical_overlap`
+- `factual_correctness`
+- `topic_coverage`
+- `critical_divergence`
+
+Use quando existe `expected_answer` ou `reference_context` e faz sentido comparar output com uma referencia conhecida.
+
+### C. Grounding / RAG
+
+- `faithfulness`
+- `answer_relevancy` (equivalente pratico a response relevancy)
+- `context_precision`
+- `context_recall`
+- `groundedness`
+
+Usa Ragas quando instalado e o formato do caso permite. Se nao houver dependencias ou campos necessarios, a UI mostra `SKIPPED` ou fallback lexical com explicacao.
+
+### D. LLM-as-judge
+
+Notas de 1 a 5 para:
+
+- `correctness`
+- `completeness`
+- `clarity`
+- `helpfulness`
+- `safety`
+- `instruction_following`
+
+O prompt do judge e salvo junto com o rationale. O judge nao e tratado como verdade absoluta.
+
+### E. Safety / adversarial
+
+- `attack_type`
+- `passed` / `failed`
+- `severity`
+- `explanation`
+- `safety_suite_pass` por caso
+
+Use para prompt injection, tentativa de ignorar instrucoes, extracao de prompt, bypass de policy, refusal quality e leakage basico de email, telefone ou API key.
+
+## Score composto
+
+Por padrao a aplicacao mostra metricas individualmente. O `composite_score` e opcional e:
+
+- usa presets `General Assistant`, `RAG Grounded QA`, `Safety First` e `Extraction/Structured Output`
+- ignora metricas `SKIPPED`
+- nao zera metricas indisponiveis
+- depende do contexto e nao substitui analise humana
+
+## Limitacoes do laboratorio
+
+- O provider `mock` e util para infra e regressao, nao para benchmark de qualidade real.
+- Ragas e sentence-transformers podem nao estar instalados no ambiente; quando faltam, a aplicacao informa fallback ou skip.
+- Judge models trazem vies proprios.
+- Safety por regex nao substitui red teaming manual.
+- Sem autenticacao neste MVP. Use localmente.
 
 ## Como rodar localmente
 
-### Pré-requisitos
+### Requisitos
 
 - Python 3.12+
-- [uv](https://docs.astral.sh/uv/) instalado
+- `uv`
 
-### Instalação
+### Setup
 
 ```bash
-git clone <repo>
-cd AiEvals
-
-# Instala dependências
 uv sync
-
-# Copia e edita configurações (opcional — funciona sem isso no modo mock)
-cp .env.example .env
+copy .env.example .env
 ```
 
-### Rodar a aplicação
+### Subir a aplicacao
 
 ```bash
 uv run python main.py
 ```
 
-Acesse: http://127.0.0.1:8000
+Abra `http://127.0.0.1:8000`.
 
-O banco SQLite e o seed data são criados automaticamente na primeira inicialização em `data/aievals.db`.
+Na primeira subida, o app cria `data/aievals.db` e popula seed data com:
 
-### Rodar os testes
+- 5 casos `general_qa`
+- 5 casos `rag_qa`
+- 5 casos `extraction`
+- 5 casos `safety_adversarial`
+- 3 `PromptTemplate`s iniciais
+
+### Rodar testes
 
 ```bash
-uv run pytest tests/ -v
+uv run pytest -v
 ```
 
-## Métricas disponíveis
+## Providers
 
-### A. Determinísticas / Estruturais
-| Métrica | Quando é calculada |
-|---------|-------------------|
-| `latency_ms` | Sempre |
-| `latency_score` | Sempre (normalizado 0-1) |
-| `cost_usd` | Quando o provider informa |
-| `response_length_chars` | Sempre |
-| `is_empty_response` | Sempre |
-| `json_validity` | Apenas para `extraction` |
-| `citation_coverage` | Quando `expected_citations` está definido |
-| `structural_completeness` | Sempre |
-| `length_adequacy` | Sempre (por tipo de cenário) |
+### Mock
 
-### B. Com referência (`expected_answer`)
-| Métrica | Quando é calculada |
-|---------|-------------------|
-| `semantic_similarity` | Quando `expected_answer` existe |
-| `lexical_overlap` | Quando `expected_answer` existe |
-| `topic_coverage` | Quando `expected_answer` existe |
-| `critical_divergence` | Quando `expected_answer` existe |
+- sempre disponivel
+- custo zero
+- ideal para smoke tests e desenvolvimento local
 
-### C. RAG / Grounding (`retrieved_context`)
-| Métrica | Quando é calculada |
-|---------|-------------------|
-| `faithfulness` | Quando `retrieved_context` existe |
-| `answer_relevancy` | Quando `retrieved_context` existe |
-| `context_precision` | Quando `retrieved_context` existe |
-| `context_recall` | Requer também `expected_answer` |
-| `groundedness` | Quando `retrieved_context` existe |
+### OpenAI-compatible
 
-Usa Ragas se instalado; senão usa fallback lexical (transparente na UI).
+- configure `OPENAI_API_KEY`
+- opcionalmente configure `OPENAI_BASE_URL`
 
-### D. LLM-as-judge (rubrica 1-5)
-Dimensões avaliadas pelo judge:
-- `correctness`, `completeness`, `clarity`, `helpfulness`, `safety`, `instruction_following`
+### Anthropic
 
-O judge usa rubrica explícita e auditável. O modelo e provider do judge são configuráveis via `.env`.
-**Importante:** o judge não é verdade absoluta — é uma referência qualitativa.
+- configure `ANTHROPIC_API_KEY`
 
-### E. Safety / Adversarial
-Tipos detectados:
-- `prompt_injection`, `system_prompt_extraction`, `policy_bypass`, `unsafe_request`, `general_adversarial`
+### Ollama
 
-## Quando cada métrica faz sentido
+- configure ou mantenha `OLLAMA_BASE_URL=http://127.0.0.1:11434/v1`
+- modelo recomendado no MVP: `gpt-oss:20b`
 
-| Cenário | Métricas mais relevantes |
-|---------|--------------------------|
-| `general_qa` | judge, semantic_similarity, lexical_overlap |
-| `rag_qa` | faithfulness, groundedness, context_recall |
-| `extraction` | json_validity, correctness |
-| `summarization` | topic_coverage, completeness |
-| `safety_adversarial` | safety, refusal_quality |
+Exemplo:
+
+```bash
+ollama pull gpt-oss:20b
+uv run python main.py
+```
+
+Na UI, selecione `provider=ollama` e `model=gpt-oss:20b`.
 
 ## Como adicionar novos modelos
 
-1. Crie `app/services/llm/seu_provider.py` herdando de `BaseLLMProvider`
-2. Implemente `generate(request) -> LLMResponse`
-3. Registre em `app/services/llm/registry.py`
-4. Adicione o nome em `AVAILABLE_PROVIDERS`
+1. Crie um provider em [app/services/llm/base.py].
+2. Implemente `generate()`.
+3. Registre no arquivo [app/services/llm/registry.py].
+4. Exponha o provider na UI de runs/settings se fizer sentido.
 
-## Como adicionar novas métricas
+## Como adicionar novas metricas
 
-1. Adicione a função em `app/services/evaluation/deterministic.py` (ou módulo adequado)
-2. Chame-a dentro de `compute_deterministic_metrics()`
-3. Retorne `{"name": "...", "value": float, "status": "computed"}` ou `{"status": "skipped", ...}`
-4. Adicione o peso no preset adequado em `app/services/evaluation/scoring.py`
+1. Escolha a familia em `app/services/evaluation/`.
+2. Retorne dicionarios no formato `{"name": "...", "value": ..., "status": "computed|skipped|failed"}`.
+3. Registre nomes da familia no executor para suportar disable/skip transparente.
+4. Se a metrica entrar em score composto, ajuste os pesos em [app/services/evaluation/scoring.py].
 
-## Limitações do laboratório
+## Estrutura principal
 
-- O provider mock não gera respostas realistas — use para testes de infraestrutura
-- Métricas RAG com Ragas requerem instalação separada (`uv add ragas datasets`)
-- Similaridade semântica requer `sentence-transformers` (`uv add sentence-transformers`)
-- O judge LLM tem vieses próprios; não interprete notas como verdade objetiva
-- Métricas lexicais (fallback) são menos precisas que embeddings
-- Sem autenticação — modo local apenas
-
-## Próximos passos recomendados
-
-1. Instalar `sentence-transformers` para similaridade semântica real
-2. Instalar `ragas` e `datasets` para métricas RAG completas
-3. Configurar uma API key real (OpenAI ou Anthropic) no `.env`
-4. Adicionar exportação compatível com Promptfoo
-5. Integrar com Phoenix/Langfuse para observabilidade em nuvem
-6. Adicionar autenticação básica para compartilhamento interno
+- [app/api]
+- [app/core]
+- [app/db]
+- [app/models]
+- [app/services]
+- [app/templates]
+- [docs/architecture.md]
+- [docs/evaluation-methodology.md]
+- [docs/data-model.md]
+- [docs/security-notes.md]

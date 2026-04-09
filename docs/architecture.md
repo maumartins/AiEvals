@@ -1,93 +1,113 @@
-# Arquitetura — AI Response Quality Lab
+# Arquitetura
 
-## Classificação
+## Classificacao do sistema
 
-- **Tipo**: Analítico / Assistivo
-- **Impacto do erro**: Baixo a Médio (erros afetam interpretação de métricas, não sistemas em produção)
-- **Autonomia**: Sem autonomia operacional — todas as ações requerem iniciativa humana
-- **PII**: Não usa por padrão; redaction básica em logs para email, telefone e chaves API
-- **Tool Use**: Somente leitura (consulta a APIs de LLM)
-- **Supervisão humana**: Recomendável na interpretação dos resultados
+- Tipo: analitico / assistivo
+- Impacto do erro: baixo a medio
+- Autonomia: sem autonomia operacional
+- PII: nao usar por padrao; prever redaction basica
+- Tool use: somente leitura
+- Supervisao humana: recomendavel na interpretacao dos resultados
 
-## Stack
+## Arquitetura escolhida
 
-```
-FastAPI (framework web)
-├── Jinja2 + HTMX (UI server-rendered)
-├── SQLModel + SQLite (banco de dados local)
-├── Pydantic + pydantic-settings (validação e config)
-└── OpenTelemetry (observabilidade local)
+O sistema e um monolito FastAPI com renderizacao server-side. A decisao segue o principio de menor complexidade suficiente:
 
-Providers LLM:
-├── Mock (sempre disponível, sem API key)
-├── OpenAI (requer OPENAI_API_KEY)
-└── Anthropic (requer ANTHROPIC_API_KEY)
+- um processo web
+- um banco SQLite local
+- um modulo de execucao que roda runs em background via `BackgroundTasks`
+- providers LLM simples, sem orquestradores externos
+- avaliacao organizada por familias de metricas
 
-Avaliação:
-├── Métricas determinísticas (built-in)
-├── Métricas com referência (built-in + sentence-transformers opcional)
-├── Métricas RAG (Ragas opcional, fallback léxico built-in)
-├── LLM-as-judge (mock por padrão, configurável)
-└── Safety suite (built-in, baseada em padrões regex)
-```
+Nao ha microservicos, multiagente, event bus ou fila externa.
 
-## Estrutura de arquivos
+## Componentes
 
-```
-app/
-├── api/           — Rotas FastAPI (datasets, runs, safety, settings, dashboard)
-├── core/          — Configuração, logging com redaction
-├── db/            — Engine SQLite, session factory
-├── models/        — Entidades SQLModel (Dataset, TestCase, ExperimentRun, etc.)
-├── services/
-│   ├── datasets.py     — CRUD + importação CSV/JSONL
-│   ├── execution.py    — Engine de execução de experimentos
-│   ├── evaluation/     — Famílias de métricas
-│   │   ├── deterministic.py
-│   │   ├── reference.py
-│   │   ├── rag_metrics.py
-│   │   ├── judge.py
-│   │   ├── safety.py
-│   │   └── scoring.py
-│   ├── llm/           — Abstração de providers
-│   │   ├── base.py
-│   │   ├── mock_provider.py
-│   │   ├── openai_provider.py
-│   │   ├── anthropic_provider.py
-│   │   └── registry.py
-│   ├── observability/ — OpenTelemetry
-│   └── safety/        — (integrado em evaluation/safety.py)
-├── templates/     — Jinja2 HTML
-└── static/        — CSS/JS estáticos
-scripts/
-└── seed.py        — Dados de exemplo
-tests/             — pytest
-docs/              — Documentação
-```
+### Camada web
 
-## Fluxo de execução de um run
+- FastAPI para rotas HTTP
+- Jinja2 + HTMX para paginas SSR
+- Tailwind CDN para estilos
 
-```
-POST /runs/ → ExperimentRun criado (status=pending)
-           → background_task(execute_run)
-           → Para cada TestCase:
-               1. build_final_prompt(case, template)
-               2. provider.generate(request) → LLMResponse
-               3. RunCaseResult salvo com latência, tokens, custo
-               4. Métricas calculadas em paralelo lógico:
-                  a. deterministic (sempre)
-                  b. reference (se expected_answer)
-                  c. rag (se retrieved_context)
-                  d. judge (sempre, mock se falhar)
-                  e. safety (se safety_adversarial)
-               5. composite_score calculado ignorando SKIPs
-           → ExperimentRun.status = completed/failed
-```
+### Camada de dados
 
-## Decisões de design
+- SQLite para persistencia local-first
+- SQLModel para entidades e relacoes
+- migracoes leves on-startup para manter compatibilidade do banco local
 
-- **Background tasks FastAPI**: execução assíncrona sem filas externas — adequado para MVP local
-- **Fallback gracioso**: métricas que dependem de libs opcionais retornam SKIPPED em vez de quebrar
-- **Judge com mock fallback**: se o judge falhar, usa resposta mock determinística, não propaga erro
-- **SQLite**: suficiente para laboratório local; migrar para Postgres em produção com mínima mudança
-- **Sem cache de embeddings**: para simplicidade; em produção, cachear embeddings é recomendado
+### Camada de execucao
+
+- `ExperimentRun` descreve a configuracao do experimento
+- `RunCaseResult` guarda resposta, custo, latencia, prompt_version, tokens e erro sanitizado
+- cada caso dispara spans de `generation`, `judge_evaluation`, `rag_metrics` e `safety_evaluation`
+
+### Camada de providers
+
+- `mock`
+- `openai`
+- `anthropic`
+- `ollama`
+
+`ollama` usa endpoint OpenAI-compatible e foi adicionado para `gpt-oss:20b`.
+
+### Camada de avaliacao
+
+- `deterministic.py`
+- `reference.py`
+- `rag_metrics.py`
+- `judge.py`
+- `safety.py`
+- `scoring.py`
+
+Cada familia calcula ou marca `SKIPPED`/`FAILED` sem derrubar a execucao completa.
+
+## Fluxo de um run
+
+1. Usuario cria um run pela UI.
+2. O run persiste `provider`, `model`, `prompt_version`, `rubric_preset`, `temperature`, `max_tokens`, `top_p` e familias de metricas habilitadas.
+3. A execucao abre sua propria `Session` usando a engine correta.
+4. Para cada `TestCase`:
+   - resolve prompt final a partir do template
+   - chama o provider
+   - salva resposta, custo, latencia, tokens, timestamp e hash do contexto
+   - calcula familias de metricas habilitadas
+   - salva judge prompt, rationale e scores
+   - salva safety result quando aplicavel
+   - calcula `composite_score` ignorando metricas `SKIPPED`
+5. A UI permite inspecao caso a caso, comparacao entre runs e filtros.
+
+## Decisoes de design relevantes
+
+### Menor arquitetura suficiente
+
+Nao foi usado LangChain, LlamaIndex ou framework agentico porque o problema e de execucao + avaliacao, nao de orquestracao complexa.
+
+### Transparencia sobre indisponibilidade
+
+Metricas que dependem de `expected_answer`, `retrieved_context`, Ragas ou embeddings nao quebram o run. Elas salvam `SKIPPED` com motivo.
+
+### Score composto e secundario
+
+O score composto existe para comparacao rapida, mas nao substitui a visao por familia de metrica.
+
+### BackgroundTasks, mas sem vazar Session
+
+A primeira implementacao passava `Session` do request para o background task. Isso e fragil. O fluxo atual passa a `engine` e reabre a sessao dentro do executor.
+
+### HTMX de status
+
+O polling agora retorna HTML e nao JSON cru, evitando quebra visual no badge de status.
+
+## Trade-offs
+
+- SQLite e suficiente para local-first, mas nao e ideal para concorrencia alta.
+- Tailwind CDN reduz setup, mas nao traz pipeline de assets.
+- Ragas e embeddings ficam opcionais para manter o bootstrap leve. Quando faltam, o sistema explicita fallback.
+
+## Evolucao prevista
+
+- autenticacao e autorizacao
+- exportacao Promptfoo
+- integracao Phoenix/Langfuse
+- suporte a bancos externos
+- mais familias de metricas e rubricas customizadas

@@ -31,8 +31,8 @@ class OpenAIProvider(BaseLLMProvider):
 
     def __init__(self, api_key: str | None = None, base_url: str | None = None):
         self._client = AsyncOpenAI(
-            api_key=api_key or settings.openai_api_key,
-            base_url=base_url,
+            api_key=api_key or settings.openai_api_key or "not-required",
+            base_url=base_url or settings.openai_base_url or None,
         )
 
     @property

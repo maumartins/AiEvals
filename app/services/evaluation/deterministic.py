@@ -18,6 +18,7 @@ def _skipped(name: str, reason: str) -> dict:
 def compute_deterministic_metrics(case: TestCase, result: RunCaseResult) -> list[dict]:
     metrics = []
     response = result.response or ""
+    metadata = case.get_metadata()
 
     # 1. Latência (normalizada 0-1: <500ms=1, >5000ms=0)
     if result.latency_ms is not None:
@@ -42,8 +43,9 @@ def compute_deterministic_metrics(case: TestCase, result: RunCaseResult) -> list
     is_empty = 1.0 if not response.strip() else 0.0
     metrics.append(_metric("is_empty_response", is_empty))
 
-    # 5. Validade JSON (apenas para extraction/structured)
-    if case.scenario_type == ScenarioType.extraction:
+    # 5. Validade JSON (quando extraction ou schema/formato exigir JSON)
+    requires_json = case.scenario_type == ScenarioType.extraction or _requires_json(metadata)
+    if requires_json:
         json_valid = _check_json_validity(response)
         metrics.append(_metric("json_validity", 1.0 if json_valid else 0.0, {"valid": json_valid}))
     else:
@@ -64,7 +66,45 @@ def compute_deterministic_metrics(case: TestCase, result: RunCaseResult) -> list
     adequacy = _length_adequacy(response, case.scenario_type)
     metrics.append(_metric("length_adequacy", adequacy))
 
+    # 9. Tokens
+    if result.tokens_input is not None:
+        metrics.append(_metric("prompt_token_count", float(result.tokens_input)))
+    else:
+        metrics.append(_skipped("prompt_token_count", "Quantidade de tokens de entrada indisponível"))
+
+    if result.tokens_output is not None:
+        metrics.append(_metric("response_token_count", float(result.tokens_output)))
+    else:
+        metrics.append(_skipped("response_token_count", "Quantidade de tokens de saída indisponível"))
+
+    if result.tokens_input is not None and result.tokens_output is not None:
+        metrics.append(_metric("total_token_count", float(result.tokens_input + result.tokens_output)))
+    else:
+        metrics.append(_skipped("total_token_count", "Quantidade total de tokens indisponível"))
+
+    # 10. Regras configuráveis por keyword
+    keyword_metric = _keyword_rules_metric(response, metadata)
+    if keyword_metric:
+        metrics.append(keyword_metric)
+    else:
+        metrics.append(_skipped("keyword_rule_adherence", "Nenhuma keyword rule configurada"))
+
+    # 11. Regras configuráveis por regex
+    regex_metric = _regex_rules_metric(response, metadata)
+    if regex_metric:
+        metrics.append(regex_metric)
+    else:
+        metrics.append(_skipped("regex_rule_adherence", "Nenhuma regex rule configurada"))
+
     return metrics
+
+
+def _requires_json(metadata: dict) -> bool:
+    return bool(
+        metadata.get("json_schema_required")
+        or metadata.get("require_json_schema")
+        or metadata.get("response_format") == "json"
+    )
 
 
 def _check_json_validity(text: str) -> bool:
@@ -133,3 +173,52 @@ def _length_adequacy(response: str, scenario_type: ScenarioType) -> float:
     if length > max_w:
         return round(max_w / length, 3)
     return 1.0
+
+
+def _keyword_rules_metric(response: str, metadata: dict) -> Optional[dict]:
+    required = metadata.get("required_keywords") or []
+    forbidden = metadata.get("forbidden_keywords") or []
+    if not required and not forbidden:
+        return None
+
+    response_lower = response.lower()
+    matched_required = sum(1 for keyword in required if str(keyword).lower() in response_lower)
+    avoided_forbidden = sum(1 for keyword in forbidden if str(keyword).lower() not in response_lower)
+    total_rules = len(required) + len(forbidden)
+    score = (matched_required + avoided_forbidden) / max(total_rules, 1)
+    return _metric(
+        "keyword_rule_adherence",
+        round(score, 4),
+        {
+            "required_keywords": required,
+            "forbidden_keywords": forbidden,
+            "matched_required": matched_required,
+            "avoided_forbidden": avoided_forbidden,
+        },
+    )
+
+
+def _regex_rules_metric(response: str, metadata: dict) -> Optional[dict]:
+    must_match = metadata.get("regex_must_match") or []
+    must_not_match = metadata.get("regex_must_not_match") or []
+    if isinstance(must_match, str):
+        must_match = [must_match]
+    if isinstance(must_not_match, str):
+        must_not_match = [must_not_match]
+    if not must_match and not must_not_match:
+        return None
+
+    matched = sum(1 for pattern in must_match if re.search(pattern, response, re.IGNORECASE))
+    avoided = sum(1 for pattern in must_not_match if not re.search(pattern, response, re.IGNORECASE))
+    total_rules = len(must_match) + len(must_not_match)
+    score = (matched + avoided) / max(total_rules, 1)
+    return _metric(
+        "regex_rule_adherence",
+        round(score, 4),
+        {
+            "regex_must_match": must_match,
+            "regex_must_not_match": must_not_match,
+            "matched_patterns": matched,
+            "avoided_patterns": avoided,
+        },
+    )

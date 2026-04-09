@@ -3,70 +3,167 @@
 ## Entidades
 
 ### Dataset
-Agrupa casos de teste por tema ou objetivo.
-- `id`, `name`, `description`, `category`, `created_at`
+
+Agrupa casos de teste.
+
+- `id`
+- `name`
+- `description`
+- `category`
+- `created_at`
 
 ### TestCase
-Caso individual de avaliação.
-- `dataset_id` → Dataset
-- `user_input` (obrigatório)
-- `system_prompt` (opcional)
-- `expected_answer` (habilita métricas de referência)
-- `retrieved_context` (habilita métricas RAG)
-- `reference_context` (contexto de referência para julgamento)
-- `expected_citations` (JSON array de strings)
-- `metadata_json` (JSON livre)
-- `severity`: low | medium | high
-- `scenario_type`: general_qa | rag_qa | summarization | extraction | classification | safety_adversarial
+
+Representa um caso individual.
+
+- `id`
+- `dataset_id`
+- `name`
+- `category`
+- `tags`
+- `user_input`
+- `system_prompt`
+- `expected_answer`
+- `retrieved_context`
+- `reference_context`
+- `expected_citations`
+- `metadata_json`
+- `severity`
+- `scenario_type`
+- `created_at`
+
+`metadata_json` suporta regras como:
+
+- `required_keywords`
+- `forbidden_keywords`
+- `regex_must_match`
+- `regex_must_not_match`
+- `response_format`
+- `json_schema_required`
 
 ### PromptTemplate
-Template reutilizável com variáveis `{{user_input}}`, `{{retrieved_context}}`.
-- `name`, `version`, `system_template`, `user_template`
+
+- `id`
+- `name`
+- `version`
+- `system_template`
+- `user_template`
+- `description`
+- `created_at`
+
+Variaveis suportadas no MVP:
+
+- `{{user_input}}`
+- `{{retrieved_context}}`
+- `{{reference_context}}`
+- `{{expected_answer}}`
+- `{{expected_citations}}`
 
 ### ExperimentRun
-Uma execução de dataset contra um modelo com configuração específica.
-- `dataset_id`, `prompt_template_id`
-- `provider`, `model`, `temperature`, `max_tokens`, `top_p`
-- `scoring_preset`: general_assistant | rag_grounded_qa | safety_first | extraction_structured
-- `status`: pending | running | completed | failed
+
+Configura uma execucao sobre um dataset.
+
+- `id`
+- `name`
+- `dataset_id`
+- `prompt_template_id`
+- `provider`
+- `model`
+- `temperature`
+- `max_tokens`
+- `top_p`
+- `rubric_preset`
+- `prompt_version`
+- `scoring_preset`
+- `enabled_metrics`
+- `status`
+- `error_message`
+- `started_at`
+- `completed_at`
+- `created_at`
 
 ### RunCaseResult
-Resultado de um caso dentro de um run.
-- `run_id`, `test_case_id`
-- `trace_id` (UUID único por caso)
-- `final_prompt`, `response`
-- `tokens_input`, `tokens_output`, `cost_usd`, `latency_ms`
-- `context_hash` (SHA256 truncado do retrieved_context)
-- `raw_error` (sanitizado, sem stacktrace)
+
+Resultado operacional e analitico por caso.
+
+- `id`
+- `run_id`
+- `test_case_id`
+- `trace_id`
+- `final_prompt`
+- `prompt_version`
+- `response`
+- `tokens_input`
+- `tokens_output`
+- `cost_usd`
+- `latency_ms`
+- `status`
+- `raw_error`
+- `model_metadata`
+- `context_hash`
+- `timestamp`
 
 ### MetricScore
-Uma métrica calculada para um resultado.
-- `result_id`, `metric_name`, `metric_family`
-- `value` (float ou null se SKIPPED/FAILED)
-- `status`: computed | skipped | failed
-- `skip_reason` (explicação quando SKIPPED)
-- `details` (JSON com detalhes extras)
+
+Cada metrica e persistida separadamente.
+
+- `id`
+- `result_id`
+- `metric_name`
+- `metric_family`
+- `value`
+- `status`
+- `skip_reason`
+- `details`
 
 ### JudgeResult
-Avaliação LLM-as-judge para um resultado.
-- `result_id`, `judge_provider`, `judge_model`
-- `judge_prompt` (auditável)
-- `correctness`, `completeness`, `clarity`, `helpfulness`, `safety`, `instruction_following` (1-5)
-- `rationale` (resumo do julgamento)
+
+- `id`
+- `result_id`
+- `judge_provider`
+- `judge_model`
+- `judge_prompt`
+- `correctness`
+- `completeness`
+- `clarity`
+- `helpfulness`
+- `safety`
+- `instruction_following`
+- `rationale`
+- `raw_response`
+- `timestamp`
 
 ### SafetyResult
-Resultado de avaliação de segurança.
-- `result_id`, `attack_type`, `passed`, `explanation`, `severity`
+
+- `id`
+- `result_id`
+- `attack_type`
+- `passed`
+- `explanation`
+- `severity`
+- `timestamp`
 
 ### AppSetting
-Configurações dinâmicas da aplicação (key-value).
 
-## Diagrama simplificado
+- `key`
+- `value`
+- `description`
+- `updated_at`
 
+## Relacoes
+
+```text
+Dataset 1 ── * TestCase
+ExperimentRun 1 ── * RunCaseResult
+TestCase 1 ── * RunCaseResult
+RunCaseResult 1 ── * MetricScore
+RunCaseResult 1 ── 1 JudgeResult
+RunCaseResult 1 ── 1 SafetyResult
 ```
-Dataset ──< TestCase ──< RunCaseResult >── ExperimentRun
-                              │
-                    ┌─────────┼──────────┐
-                    ▼         ▼          ▼
-              MetricScore  JudgeResult  SafetyResult
-```
+
+## Observacoes
+
+- `trace_id` e rastreavel na UI e nos logs.
+- `prompt_version` e salvo no run e no resultado por caso.
+- `raw_error` e sanitizado.
+- `enabled_metrics` controla familias de metricas, nao um framework generico de plugins.

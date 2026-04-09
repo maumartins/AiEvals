@@ -1,6 +1,7 @@
 """Configuração básica de OpenTelemetry local."""
 
 from opentelemetry import trace
+from opentelemetry.trace.span import format_trace_id
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
@@ -30,3 +31,11 @@ def setup_tracing() -> None:
 def get_tracer(name: str) -> trace.Tracer:
     setup_tracing()
     return trace.get_tracer(name)
+
+
+def current_trace_id() -> str:
+    span = trace.get_current_span()
+    context = span.get_span_context()
+    if not context or not context.trace_id:
+        return ""
+    return format_trace_id(context.trace_id)

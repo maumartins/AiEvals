@@ -1,196 +1,253 @@
 {% extends "base.html" %}
-{% block title %}{{ run.name or "Run #" ~ run.id }} — Experimento{% endblock %}
+{% block title %}{{ run.name or "Experimento #" ~ run.id }}{% endblock %}
 {% block content %}
 <div class="mb-6">
-  <a href="/runs/" class="text-indigo-600 hover:text-indigo-800 text-sm">← Experimentos</a>
-  <div class="flex items-center justify-between mt-2">
-    <h1 class="text-3xl font-bold text-gray-900">{{ run.name or "Run #" ~ run.id }}</h1>
-    {% if run.status.value == "completed" %}<span class="badge-green text-base px-3 py-1">✓ Concluído</span>
-    {% elif run.status.value == "running" %}
-    <span class="badge-yellow text-base px-3 py-1" id="status-badge"
-      hx-get="/runs/{{ run.id }}/status"
-      hx-trigger="every 3s"
-      hx-swap="outerHTML">⏳ Executando…</span>
-    {% elif run.status.value == "failed" %}<span class="badge-red text-base px-3 py-1">✗ Falhou</span>
-    {% else %}<span class="badge-gray text-base px-3 py-1">Pendente</span>{% endif %}
+  <a href="/runs/" class="text-teal-700 hover:text-teal-900 text-sm">← Experimentos</a>
+  <div class="flex items-center justify-between mt-2 gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">{{ run.name or "Experimento #" ~ run.id }}</h1>
+      <p class="text-sm text-gray-500 mt-1">Inspecione entradas, saídas, métricas, judge e segurança caso a caso.</p>
+    </div>
+    <div>
+      {% if run.status.value == "completed" %}
+      <span class="badge-green text-base px-3 py-1">Concluído</span>
+      {% elif run.status.value == "running" %}
+      <span class="badge-yellow text-base px-3 py-1" id="status-badge" hx-get="/runs/{{ run.id }}/status" hx-trigger="every 3s" hx-swap="outerHTML">Em execução</span>
+      {% elif run.status.value == "failed" %}
+      <span class="badge-red text-base px-3 py-1">Falhou</span>
+      {% else %}
+      <span class="badge-gray text-base px-3 py-1">Pendente</span>
+      {% endif %}
+    </div>
   </div>
 </div>
 
-<!-- Metadados do run -->
 <div class="card mb-6">
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-    <div><span class="text-gray-500">Dataset:</span> <strong>{{ dataset.name if dataset else run.dataset_id }}</strong></div>
-    <div><span class="text-gray-500">Provider/Modelo:</span> <strong class="font-mono">{{ run.provider }}/{{ run.model }}</strong></div>
-    <div><span class="text-gray-500">Temperature:</span> <strong>{{ run.temperature }}</strong></div>
-    <div><span class="text-gray-500">Preset:</span> <strong>{{ run.scoring_preset.value }}</strong></div>
-    <div><span class="text-gray-500">Casos:</span> <strong>{{ results | length }}</strong></div>
-    <div><span class="text-gray-500">Iniciado:</span> <strong>{{ run.started_at.strftime('%d/%m %H:%M') if run.started_at else '—' }}</strong></div>
-    <div><span class="text-gray-500">Concluído:</span> <strong>{{ run.completed_at.strftime('%d/%m %H:%M') if run.completed_at else '—' }}</strong></div>
+  <div class="flex flex-wrap gap-3 justify-between items-start">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm flex-1">
+      <div><span class="text-gray-500">Dataset:</span><br><strong>{{ dataset.name if dataset else run.dataset_id }}</strong></div>
+      <div><span class="text-gray-500">Provedor / modelo:</span><br><strong class="font-mono">{{ run.provider }}/{{ run.model }}</strong></div>
+      <div><span class="text-gray-500">Versão do prompt:</span><br><strong class="font-mono">{{ run.prompt_version }}</strong></div>
+      <div><span class="text-gray-500">Rubrica do judge:</span><br><strong>{{ rubric_label(run.rubric_preset) }}</strong></div>
+      <div><span class="text-gray-500">Temperatura:</span><br><strong>{{ run.temperature }}</strong></div>
+      <div><span class="text-gray-500">Top P:</span><br><strong>{{ run.top_p if run.top_p is not none else "—" }}</strong></div>
+      <div><span class="text-gray-500">Preset de score:</span><br><strong>{{ preset_label(run.scoring_preset.value) }}</strong></div>
+      <div><span class="text-gray-500">Métricas habilitadas:</span><br><strong>{{ enabled_metrics | join(", ") }}</strong></div>
+      <div><span class="text-gray-500">Iniciado:</span><br><strong>{{ run.started_at.strftime('%d/%m %H:%M:%S') if run.started_at else "—" }}</strong></div>
+      <div><span class="text-gray-500">Concluído:</span><br><strong>{{ run.completed_at.strftime('%d/%m %H:%M:%S') if run.completed_at else "—" }}</strong></div>
+      {% if template %}
+      <div class="md:col-span-2"><span class="text-gray-500">Template de prompt:</span><br><strong>{{ template.name }} v{{ template.version }}</strong></div>
+      {% endif %}
+    </div>
+    <div class="flex flex-col gap-2">
+      <form action="/runs/{{ run.id }}/reevaluate" method="post">
+        <button class="btn-secondary text-sm">Reavaliar judge e segurança</button>
+      </form>
+      <a href="/safety/" class="btn-secondary text-sm">Gerenciar cenários de segurança</a>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="card">
+    <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">Cobertura do judge</div>
+    <div class="text-2xl font-semibold text-gray-900">{{ judge_complete }} / {{ results | length }}</div>
+    <div class="text-sm text-gray-500">Executado automaticamente ao fim do run. Se algo falhar, use o botão de reavaliação.</div>
+  </div>
+  <div class="card">
+    <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">Cobertura de segurança</div>
+    <div class="text-2xl font-semibold text-gray-900">{{ safety_complete }} caso(s)</div>
+    <div class="text-sm text-gray-500">Aplicável para cenários do tipo segurança/adversarial.</div>
+  </div>
+  <div class="card">
+    <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">Segurança aprovada</div>
+    <div class="text-2xl font-semibold text-gray-900">{{ safety_passed }}</div>
+    <div class="text-sm text-gray-500">Quantidade de casos de segurança que passaram.</div>
   </div>
 </div>
 
 {% if results %}
-<!-- Resumo de métricas -->
-{% set completed_results = results | selectattr("result.status.value", "eq", "completed") | list %}
-{% if completed_results %}
-<div class="card mb-6">
-  <h2 class="text-lg font-semibold text-gray-900 mb-3">Resumo por Família de Métricas</h2>
-  <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm text-center">
-    {% set families = ["deterministic", "reference", "rag", "composite"] %}
-    {% for family in families %}
-    <div class="bg-gray-50 rounded-lg p-3">
-      <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ family }}</div>
-      {% set all_vals = [] %}
-      {% for item in completed_results %}
-        {% for m in item.metrics %}
-          {% if m.metric_family == family and m.value is not none %}
-            {% set _ = all_vals.append(m.value) %}
-          {% endif %}
-        {% endfor %}
-      {% endfor %}
-      {% if all_vals %}
-      <div class="{{ (all_vals | sum / all_vals | length) | metric_color }}">
-        {{ "%.3f" | format(all_vals | sum / all_vals | length) }}
-      </div>
-      <div class="text-xs text-gray-400">{{ all_vals | length }} métrica(s)</div>
-      {% else %}
-      <div class="text-gray-400">—</div>
-      {% endif %}
-    </div>
-    {% endfor %}
-    <div class="bg-indigo-50 rounded-lg p-3">
-      <div class="text-xs text-indigo-600 uppercase tracking-wide mb-1">Judge Avg</div>
-      {% set judge_scores = [] %}
-      {% for item in completed_results %}
-        {% if item.judge %}
-          {% for field in ["correctness", "completeness", "clarity", "helpfulness", "safety"] %}
-            {% set val = item.judge | attr(field) %}
-            {% if val is not none %}{% set _ = judge_scores.append(val) %}{% endif %}
-          {% endfor %}
-        {% endif %}
-      {% endfor %}
-      {% if judge_scores %}
-      <div class="{{ (judge_scores | sum / judge_scores | length / 5) | metric_color }}">
-        {{ "%.1f" | format(judge_scores | sum / judge_scores | length) }}/5
-      </div>
-      {% else %}<div class="text-gray-400">—</div>{% endif %}
-    </div>
-  </div>
-</div>
-{% endif %}
-
-<!-- Resultados por caso -->
 <div class="space-y-4">
   {% for item in results %}
   {% set result = item.result %}
   {% set case = item.test_case %}
   {% set metrics = item.metrics %}
   {% set judge = item.judge %}
+  {% set safety = item.safety %}
 
   <div class="card">
-    <div class="flex items-start justify-between mb-3">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
       <div class="flex-1">
-        <div class="flex items-center gap-2 mb-1">
-          {% if case %}
+        <div class="flex flex-wrap items-center gap-2 mb-1">
           <span class="font-medium text-gray-900">{{ case.name or "Caso #" ~ case.id }}</span>
-          <span class="badge-blue text-xs">{{ case.scenario_type.value }}</span>
-          <span class="badge-{{ 'red' if case.severity.value == 'high' else ('yellow' if case.severity.value == 'medium' else 'gray') }} text-xs">{{ case.severity.value }}</span>
-          {% endif %}
-          {% if result.status.value == "completed" %}<span class="badge-green text-xs">✓</span>
-          {% elif result.status.value == "failed" %}<span class="badge-red text-xs">✗ Falhou</span>{% endif %}
-        </div>
-        <div class="flex gap-4 text-xs text-gray-500">
-          {% if result.latency_ms %}<span>⏱ {{ result.latency_ms | ms }}</span>{% endif %}
-          {% if result.cost_usd is not none %}<span>💰 {{ result.cost_usd | usd }}</span>{% endif %}
-          {% if result.tokens_input %}<span>🔢 {{ result.tokens_input }}→{{ result.tokens_output or "?" }} tokens</span>{% endif %}
-          <span class="font-mono text-gray-300" title="trace_id">{{ result.trace_id[:8] }}…</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Input / Output -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-      <div>
-        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Input</div>
-        <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 max-h-32 overflow-y-auto">{{ result.final_prompt or (case.user_input if case else "—") }}</div>
-        {% if case and case.retrieved_context %}
-        <div class="text-xs font-medium text-gray-500 mb-1 mt-2 uppercase tracking-wide">Contexto RAG</div>
-        <div class="bg-blue-50 rounded-lg p-3 text-xs text-gray-700 max-h-20 overflow-y-auto">{{ case.retrieved_context[:300] }}{% if case.retrieved_context | length > 300 %}…{% endif %}</div>
-        {% endif %}
-      </div>
-      <div>
-        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Resposta</div>
-        {% if result.raw_error %}
-        <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">⚠ Erro: {{ result.raw_error }}</div>
-        {% elif result.response %}
-        <div class="bg-green-50 rounded-lg p-3 text-sm text-gray-700 max-h-32 overflow-y-auto">{{ result.response }}</div>
-        {% else %}
-        <div class="text-gray-400 text-sm">Sem resposta</div>
-        {% endif %}
-        {% if case and case.expected_answer %}
-        <div class="text-xs font-medium text-gray-500 mb-1 mt-2 uppercase tracking-wide">Esperado</div>
-        <div class="bg-yellow-50 rounded-lg p-3 text-xs text-gray-700 max-h-20 overflow-y-auto">{{ case.expected_answer }}</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Métricas -->
-    {% if metrics %}
-    <details>
-      <summary class="text-xs font-medium text-gray-600 cursor-pointer mb-2 hover:text-indigo-600">
-        Ver {{ metrics | length }} métrica(s) ▾
-      </summary>
-      <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-        {% for m in metrics %}
-        <div class="bg-gray-50 rounded p-2">
-          <div class="text-gray-500 truncate" title="{{ m.metric_name }}">{{ m.metric_name }}</div>
-          {% if m.status.value == "computed" %}
-          <div class="{{ m.value | metric_color if m.value is not none else 'text-gray-400' }}">
-            {% if m.value is not none %}{{ "%.4f" | format(m.value) }}{% else %}null{% endif %}
-          </div>
-          {% elif m.status.value == "skipped" %}
-          <div class="text-gray-400 italic" title="{{ m.skip_reason }}">SKIP</div>
+          <span class="badge-blue text-xs">{{ scenario_label(case.scenario_type.value) }}</span>
+          <span class="badge-{{ 'red' if case.severity.value == 'high' else ('yellow' if case.severity.value == 'medium' else 'gray') }} text-xs">{{ severity_label(case.severity.value) }}</span>
+          {% if result.status.value == "completed" %}
+          <span class="badge-green text-xs">{{ status_label(result.status.value) }}</span>
+          {% elif result.status.value == "failed" %}
+          <span class="badge-red text-xs">Erro de modelo</span>
           {% else %}
-          <div class="text-red-400">FAIL</div>
+          <span class="badge-gray text-xs">{{ status_label(result.status.value) }}</span>
           {% endif %}
-          <div class="text-gray-300">{{ m.metric_family }}</div>
+        </div>
+        <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+          <span>trace_id: <span class="font-mono">{{ result.trace_id[:12] }}...</span></span>
+          <span>versão do prompt: <span class="font-mono">{{ result.prompt_version }}</span></span>
+          {% if result.latency_ms is not none %}<span>latência {{ result.latency_ms | ms }}</span>{% endif %}
+          {% if result.cost_usd is not none %}<span>custo {{ result.cost_usd | usd }}</span>{% endif %}
+          {% if result.tokens_input is not none %}<span>tokens {{ result.tokens_input }} → {{ result.tokens_output or "?" }} (total {{ (result.tokens_input or 0) + (result.tokens_output or 0) }})</span>{% endif %}
+          {% if result.context_hash %}<span>hash do contexto <span class="font-mono">{{ result.context_hash }}</span></span>{% endif %}
+        </div>
+      </div>
+      {% if safety %}
+      <div class="text-right">
+        <div class="text-xs uppercase tracking-wide text-gray-500 mb-1">Segurança</div>
+        <span class="badge-{{ 'green' if safety.passed else 'red' }}">{{ "Passou" if safety.passed else "Falhou" }}</span>
+        <div class="text-xs text-gray-500 mt-1">{{ safety.attack_type }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="space-y-3">
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Entrada final</div>
+          <div class="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 max-h-44 overflow-y-auto whitespace-pre-wrap">{{ result.final_prompt or case.user_input }}</div>
+        </div>
+        {% if case.system_prompt %}
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Prompt de sistema</div>
+          <div class="bg-slate-50 rounded-lg p-3 text-xs text-slate-700 max-h-32 overflow-y-auto whitespace-pre-wrap">{{ case.system_prompt }}</div>
+        </div>
+        {% endif %}
+        {% if case.retrieved_context %}
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contexto recuperado</div>
+          <div class="bg-blue-50 rounded-lg p-3 text-xs text-slate-700 max-h-32 overflow-y-auto whitespace-pre-wrap">{{ case.retrieved_context }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Resposta</div>
+          {% if result.raw_error %}
+          <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">Erro do modelo: {{ result.raw_error }}</div>
+          {% elif result.response %}
+          <div class="bg-emerald-50 rounded-lg p-3 text-sm text-slate-700 max-h-44 overflow-y-auto whitespace-pre-wrap">{{ result.response }}</div>
+          {% else %}
+          <div class="text-gray-400 text-sm">Sem resposta.</div>
+          {% endif %}
+        </div>
+        {% if case.expected_answer %}
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Resposta esperada</div>
+          <div class="bg-amber-50 rounded-lg p-3 text-xs text-slate-700 max-h-28 overflow-y-auto whitespace-pre-wrap">{{ case.expected_answer }}</div>
+        </div>
+        {% endif %}
+        {% if case.reference_context %}
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Contexto de referência</div>
+          <div class="bg-slate-50 rounded-lg p-3 text-xs text-slate-700 max-h-28 overflow-y-auto whitespace-pre-wrap">{{ case.reference_context }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if case.expected_citations or (case.metadata_json and case.metadata_json != "{}") %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {% if case.expected_citations %}
+      <div>
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Citações esperadas</div>
+        <div class="bg-slate-50 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap">{{ case.expected_citations }}</div>
+      </div>
+      {% endif %}
+      {% if case.metadata_json and case.metadata_json != "{}" %}
+      <div>
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Metadata JSON</div>
+        <div class="bg-slate-50 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap">{{ case.metadata_json }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if metrics %}
+    <details class="mb-3">
+      <summary class="text-xs font-medium text-gray-600 cursor-pointer hover:text-teal-700">Ver {{ metrics | length }} métricas</summary>
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 text-xs">
+        {% for metric in metrics %}
+        <div class="bg-slate-50 rounded p-3 border border-slate-200">
+          <div class="flex items-start justify-between gap-2">
+            <div class="font-medium text-slate-700">{{ metric_label(metric.metric_name) }}</div>
+            <span class="tooltip-icon" title="{{ metric_tooltip(metric.metric_name) }}">i</span>
+          </div>
+          {% if metric.status.value == "computed" %}
+          <div class="{{ metric_value_class(metric.value, metric.metric_name) }} text-sm mt-2">
+            {{ metric_display_value(metric.metric_name, metric.value) }}
+          </div>
+          {% elif metric.status.value == "skipped" %}
+          <div class="text-slate-400 italic mt-2">Não calculada</div>
+          <div class="text-slate-400">{{ metric.skip_reason or "Sem motivo informado." }}</div>
+          {% else %}
+          <div class="text-red-500 mt-2">Falhou</div>
+          <div class="text-slate-400">{{ metric.skip_reason or "Erro na avaliação." }}</div>
+          {% endif %}
+          <div class="text-slate-300 mt-1">{{ metric.metric_family }}</div>
         </div>
         {% endfor %}
       </div>
     </details>
     {% endif %}
 
-    <!-- Judge -->
-    {% if judge %}
-    <details>
-      <summary class="text-xs font-medium text-indigo-600 cursor-pointer mt-2 hover:text-indigo-800">
-        Ver avaliação do Judge ({{ judge.judge_provider }}/{{ judge.judge_model }}) ▾
-      </summary>
-      <div class="mt-2 bg-indigo-50 rounded-lg p-3">
-        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs text-center mb-3">
-          {% for field, label in [("correctness","Correção"),("completeness","Completude"),("clarity","Clareza"),("helpfulness","Utilidade"),("safety","Segurança"),("instruction_following","Instrução")] %}
+    <details class="mb-3">
+      <summary class="text-xs font-medium text-teal-700 cursor-pointer hover:text-teal-900">Ver avaliação do judge</summary>
+      <div class="mt-3 bg-teal-50 rounded-lg p-4">
+        {% if judge %}
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs text-center mb-4">
+          {% for field in ["correctness","completeness","clarity","helpfulness","safety","instruction_following"] %}
           {% set val = judge | attr(field) %}
           <div>
-            <div class="text-gray-500">{{ label }}</div>
-            <div class="{{ val | judge_color if val is not none else 'text-gray-400' }} text-lg font-bold">{{ val or "—" }}</div>
-            <div class="text-gray-400">/5</div>
+            <div class="text-slate-500">{{ metric_label(field) }}</div>
+            <div class="{{ judge_color(val) if val is not none else 'text-slate-400' }} text-lg font-bold">{{ metric_display_value(field, val) if val is not none else "—" }}</div>
+            <div class="text-slate-400">/5</div>
           </div>
           {% endfor %}
         </div>
         {% if judge.rationale %}
-        <div class="text-xs text-gray-600 italic border-t border-indigo-200 pt-2">{{ judge.rationale }}</div>
+        <div class="text-sm text-slate-700 mb-3"><strong>Resumo do julgamento:</strong> {{ judge.rationale }}</div>
         {% endif %}
-        <div class="text-xs text-gray-400 mt-2">⚠ O judge não é verdade absoluta. Use como referência qualitativa.</div>
+        <details>
+          <summary class="text-xs text-slate-500 cursor-pointer">Ver prompt do judge / rubrica</summary>
+          <div class="mt-2 bg-white rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap max-h-48 overflow-y-auto">{{ judge.judge_prompt }}</div>
+        </details>
+        <div class="text-xs text-slate-500 mt-3">O judge é executado automaticamente. Se esta área ficar vazia após uma execução concluída, clique em “Reavaliar judge e segurança”.</div>
+        {% else %}
+        <div class="text-sm text-slate-600">O judge ainda não foi executado ou falhou. Use o botão “Reavaliar judge e segurança”.</div>
+        {% endif %}
       </div>
     </details>
-    {% endif %}
+
+    <details>
+      <summary class="text-xs font-medium text-teal-700 cursor-pointer hover:text-teal-900">Ver avaliação de segurança</summary>
+      <div class="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+        {% if safety %}
+        <div class="flex items-center gap-2 mb-1">
+          <span class="badge-{{ 'green' if safety.passed else 'red' }}">{{ "Passou" if safety.passed else "Falhou" }}</span>
+          <span class="font-medium">{{ safety.attack_type }}</span>
+          <span class="badge-{{ 'red' if safety.severity.value == 'high' else ('yellow' if safety.severity.value == 'medium' else 'gray') }}">{{ severity_label(safety.severity.value) }}</span>
+        </div>
+        <div>{{ safety.explanation }}</div>
+        {% else %}
+        <div>Sem avaliação de segurança para este caso. Isso é esperado fora de cenários do tipo segurança/adversarial.</div>
+        {% endif %}
+      </div>
+    </details>
   </div>
   {% endfor %}
 </div>
 {% else %}
 <div class="card text-center py-12 text-gray-400">
-  <div class="text-4xl mb-3">⏳</div>
-  <p>Aguardando execução dos casos…</p>
+  <p>Aguardando execução dos casos.</p>
 </div>
 {% endif %}
 {% endblock %}

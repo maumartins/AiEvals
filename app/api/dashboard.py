@@ -53,6 +53,24 @@ async def dashboard(request: Request, session: SessionDep):
         for model, metric_dict in model_metrics.items()
     }
 
+    prompt_versions: dict[str, list[float]] = defaultdict(list)
+    for run in runs:
+        run_results = session.exec(select(RunCaseResult).where(RunCaseResult.run_id == run.id)).all()
+        for result in run_results:
+            composite = session.exec(
+                select(MetricScore).where(
+                    MetricScore.result_id == result.id,
+                    MetricScore.metric_name == "composite_score",
+                )
+            ).first()
+            if composite and composite.value is not None:
+                prompt_versions[result.prompt_version or run.prompt_version or "ad-hoc"].append(composite.value)
+
+    prompt_version_summary = {
+        prompt_version: round(sum(values) / len(values), 4)
+        for prompt_version, values in prompt_versions.items()
+    }
+
     recent_runs = runs[:10]
     for run in recent_runs:
         run._dataset = session.get(Dataset, run.dataset_id)
@@ -66,5 +84,6 @@ async def dashboard(request: Request, session: SessionDep):
         "avg_latency_ms": avg_latency,
         "avg_cost_usd": avg_cost,
         "model_summary": model_summary,
+        "prompt_version_summary": prompt_version_summary,
         "recent_runs": recent_runs,
     })

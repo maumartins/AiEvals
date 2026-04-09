@@ -1,27 +1,52 @@
 {% extends "base.html" %}
-{% block title %}{{ dataset.name }} — Datasets{% endblock %}
+{% block title %}{{ dataset.name }}{% endblock %}
 {% block content %}
 <div class="mb-6">
-  <a href="/datasets/" class="text-indigo-600 hover:text-indigo-800 text-sm">← Datasets</a>
-  <div class="flex items-center justify-between mt-2">
-    <h1 class="text-3xl font-bold text-gray-900">{{ dataset.name }}</h1>
-    <span class="badge-blue">{{ cases | length }} casos</span>
+  <a href="/datasets/" class="text-teal-700 hover:text-teal-900 text-sm">← Datasets</a>
+  <div class="flex items-center justify-between mt-2 gap-4">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">{{ dataset.name }}</h1>
+      {% if dataset.description %}<p class="text-gray-500 mt-1">{{ dataset.description }}</p>{% endif %}
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="/datasets/{{ dataset.id }}/export?format=jsonl" class="btn-secondary text-sm">Exportar JSONL</a>
+      <a href="/datasets/{{ dataset.id }}/export?format=csv" class="btn-secondary text-sm">Exportar CSV</a>
+    </div>
   </div>
-  {% if dataset.description %}<p class="text-gray-500 mt-1">{{ dataset.description }}</p>{% endif %}
 </div>
 
-<!-- Importar arquivo -->
-<div class="card mb-6">
-  <h2 class="text-lg font-semibold text-gray-900 mb-3">Importar Casos (CSV ou JSONL)</h2>
-  <form action="/datasets/{{ dataset.id }}/import" method="post" enctype="multipart/form-data" class="flex items-center gap-3">
-    <input type="file" name="file" accept=".csv,.jsonl" class="block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
-    <button type="submit" class="btn-secondary text-sm">Importar</button>
-  </form>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <div class="card lg:col-span-1">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Editar dataset</h2>
+    <form action="/datasets/{{ dataset.id }}" method="post" class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Nome</label>
+        <input type="text" name="name" value="{{ dataset.name }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Categoria</label>
+        <input type="text" name="category" value="{{ dataset.category }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Descrição</label>
+        <textarea name="description" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{{ dataset.description }}</textarea>
+      </div>
+      <button type="submit" class="btn-primary w-full">Salvar dataset</button>
+    </form>
+  </div>
+
+  <div class="card lg:col-span-2">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Importar casos</h2>
+    <p class="text-sm text-gray-500 mb-4">Use CSV ou JSONL. O JSONL exportado pela aplicação pode ser reimportado depois de editado.</p>
+    <form action="/datasets/{{ dataset.id }}/import" method="post" enctype="multipart/form-data" class="flex flex-wrap items-center gap-3">
+      <input type="file" name="file" accept=".csv,.jsonl" class="block text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100">
+      <button type="submit" class="btn-secondary text-sm">Importar arquivo</button>
+    </form>
+  </div>
 </div>
 
-<!-- Adicionar caso manual -->
 <details class="card mb-6">
-  <summary class="text-lg font-semibold text-gray-900 cursor-pointer">+ Adicionar Caso Manualmente</summary>
+  <summary class="text-lg font-semibold text-gray-900 cursor-pointer">Adicionar caso manualmente</summary>
   <form action="/datasets/{{ dataset.id }}/cases" method="post" class="mt-4 space-y-3">
     <div class="grid grid-cols-2 gap-3">
       <div>
@@ -35,72 +60,93 @@
     </div>
     <div class="grid grid-cols-2 gap-3">
       <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Tipo de Cenário</label>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Cenário</label>
         <select name="scenario_type" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="general_qa">General QA</option>
-          <option value="rag_qa">RAG QA</option>
-          <option value="summarization">Sumarização</option>
-          <option value="extraction">Extração</option>
-          <option value="classification">Classificação</option>
-          <option value="safety_adversarial">Safety / Adversarial</option>
+          {% for scenario in scenario_values %}
+          <option value="{{ scenario }}">{{ scenario_label(scenario) }}</option>
+          {% endfor %}
         </select>
       </div>
       <div>
         <label class="block text-xs font-medium text-gray-700 mb-1">Severidade</label>
         <select name="severity" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="low">Baixa</option>
-          <option value="medium">Média</option>
-          <option value="high">Alta</option>
+          {% for severity in severity_values %}
+          <option value="{{ severity }}">{{ severity_label(severity) }}</option>
+          {% endfor %}
         </select>
       </div>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">User Input *</label>
+      <label class="block text-xs font-medium text-gray-700 mb-1">Pergunta / Entrada *</label>
       <textarea name="user_input" rows="3" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">System Prompt (opcional)</label>
+      <label class="block text-xs font-medium text-gray-700 mb-1">Prompt de sistema</label>
       <textarea name="system_prompt" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">Expected Answer (opcional)</label>
+      <label class="block text-xs font-medium text-gray-700 mb-1">Resposta esperada</label>
       <textarea name="expected_answer" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
     </div>
     <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">Retrieved Context (opcional)</label>
+      <label class="block text-xs font-medium text-gray-700 mb-1">Contexto recuperado</label>
       <textarea name="retrieved_context" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
     </div>
-    <button type="submit" class="btn-primary">Adicionar Caso</button>
+    <div>
+      <label class="block text-xs font-medium text-gray-700 mb-1">Contexto de referência</label>
+      <textarea name="reference_context" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Citações esperadas (JSON array ou CSV)</label>
+        <input type="text" name="expected_citations" placeholder='["Fonte A","Fonte B"]' class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-700 mb-1">Tags (JSON array ou CSV)</label>
+        <input type="text" name="tags" placeholder='["baseline","importante"]' class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-700 mb-1">Metadata JSON</label>
+      <textarea name="metadata_json" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">{}</textarea>
+    </div>
+    <button type="submit" class="btn-primary">Adicionar caso</button>
   </form>
 </details>
 
-<!-- Lista de casos -->
 <div class="card">
-  <h2 class="text-lg font-semibold text-gray-900 mb-4">Casos de Teste ({{ cases | length }})</h2>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold text-gray-900">Casos de teste ({{ cases | length }})</h2>
+  </div>
   {% if cases %}
   <div class="space-y-3">
     {% for case in cases %}
-    <div class="border border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition-colors">
-      <div class="flex items-start justify-between">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            {% if case.name %}<span class="font-medium text-gray-900">{{ case.name }}</span>{% endif %}
-            <span class="badge-blue text-xs">{{ case.scenario_type.value }}</span>
-            <span class="badge-{{ 'red' if case.severity.value == 'high' else ('yellow' if case.severity.value == 'medium' else 'gray') }} text-xs">{{ case.severity.value }}</span>
+    <div class="border border-gray-200 rounded-lg p-4 hover:border-teal-300 transition-colors">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 mb-1 flex-wrap">
+            <span class="font-medium text-gray-900">{{ case.name or "Caso #" ~ case.id }}</span>
+            <span class="badge-blue text-xs">{{ scenario_label(case.scenario_type.value) }}</span>
+            <span class="badge-{{ 'red' if case.severity.value == 'high' else ('yellow' if case.severity.value == 'medium' else 'gray') }} text-xs">{{ severity_label(case.severity.value) }}</span>
           </div>
-          <p class="text-sm text-gray-700 truncate">{{ case.user_input[:120] }}{% if case.user_input | length > 120 %}…{% endif %}</p>
-          <div class="flex gap-3 mt-1 text-xs text-gray-400">
-            {% if case.expected_answer %}<span class="text-green-600">✓ expected_answer</span>{% endif %}
-            {% if case.retrieved_context %}<span class="text-blue-600">✓ retrieved_context</span>{% endif %}
-            {% if case.system_prompt %}<span class="text-purple-600">✓ system_prompt</span>{% endif %}
+          <p class="text-sm text-gray-700">{{ case.user_input[:180] }}{% if case.user_input | length > 180 %}…{% endif %}</p>
+          <div class="flex gap-3 mt-2 text-xs text-gray-500 flex-wrap">
+            {% if case.expected_answer %}<span>Resposta esperada</span>{% endif %}
+            {% if case.retrieved_context %}<span>Contexto RAG</span>{% endif %}
+            {% if case.reference_context %}<span>Contexto de referência</span>{% endif %}
+            {% if case.expected_citations %}<span>Citações esperadas</span>{% endif %}
+            {% if case.metadata_json and case.metadata_json != "{}" %}<span>Metadata JSON</span>{% endif %}
           </div>
+        </div>
+        <div class="flex flex-wrap gap-2 justify-end">
+          <a href="/datasets/{{ dataset.id }}/cases/{{ case.id }}" class="btn-secondary text-sm">Ver / editar</a>
         </div>
       </div>
     </div>
     {% endfor %}
   </div>
   {% else %}
-  <div class="text-center py-8 text-gray-400">Nenhum caso ainda. Importe ou adicione manualmente.</div>
+  <div class="text-center py-8 text-gray-400">Nenhum caso ainda. Importe um arquivo ou adicione manualmente.</div>
   {% endif %}
 </div>
 {% endblock %}

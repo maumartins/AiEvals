@@ -1,27 +1,29 @@
 {% extends "base.html" %}
-{% block title %}Datasets — AI Quality Lab{% endblock %}
+{% block title %}Datasets{% endblock %}
 {% block content %}
 <div class="flex items-center justify-between mb-8">
   <div>
     <h1 class="text-3xl font-bold text-gray-900">Datasets</h1>
-    <p class="text-gray-500 mt-1">Gerencie conjuntos de casos de teste</p>
+    <p class="text-gray-500 mt-1">Gerencie conjuntos de casos de teste, exportações e cenários reutilizáveis.</p>
   </div>
-  <a href="/datasets/new" class="btn-primary">+ Novo Dataset</a>
+  <a href="/datasets/new" class="btn-primary">Novo dataset</a>
 </div>
 
 {% if datasets %}
 <div class="grid gap-4">
   {% for ds in datasets %}
-  <div class="card flex items-center justify-between">
-    <div>
-      <a href="/datasets/{{ ds.id }}" class="text-xl font-semibold text-indigo-600 hover:text-indigo-800">{{ ds.name }}</a>
+  <div class="card flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <a href="/datasets/{{ ds.id }}" class="text-xl font-semibold text-teal-700 hover:text-teal-900">{{ ds.name }}</a>
       {% if ds.category %}<span class="ml-2 badge-blue">{{ ds.category }}</span>{% endif %}
       {% if ds.description %}<p class="text-gray-500 text-sm mt-1">{{ ds.description }}</p>{% endif %}
       <p class="text-gray-400 text-xs mt-1">Criado em {{ ds.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
     </div>
-    <div class="flex gap-2">
-      <a href="/datasets/{{ ds.id }}" class="btn-secondary text-sm">Ver casos</a>
-      <form action="/datasets/{{ ds.id }}/delete" method="post" onsubmit="return confirm('Remover dataset e todos os casos?')">
+    <div class="flex flex-wrap gap-2 justify-end">
+      <a href="/datasets/{{ ds.id }}" class="btn-secondary text-sm">Abrir</a>
+      <a href="/datasets/{{ ds.id }}/export?format=jsonl" class="btn-secondary text-sm">Exportar JSONL</a>
+      <a href="/datasets/{{ ds.id }}/export?format=csv" class="btn-secondary text-sm">Exportar CSV</a>
+      <form action="/datasets/{{ ds.id }}/delete" method="post" onsubmit="return confirm('Remover o dataset e todos os seus casos?')">
         <button class="btn-danger text-sm">Remover</button>
       </form>
     </div>
@@ -30,8 +32,7 @@
 </div>
 {% else %}
 <div class="card text-center py-16">
-  <div class="text-5xl mb-4">📦</div>
-  <p class="text-gray-500 text-lg">Nenhum dataset ainda.</p>
+  <p class="text-gray-500 text-lg">Nenhum dataset cadastrado ainda.</p>
   <a href="/datasets/new" class="mt-6 inline-block btn-primary">Criar primeiro dataset</a>
 </div>
 {% endif %}

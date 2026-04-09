@@ -1,50 +1,55 @@
-# Notas de Segurança
+# Notas de Seguranca
 
-## Modo de operação
+## Postura do MVP
 
-O AI Response Quality Lab opera em modo **local por padrão**, sem autenticação. Não deve ser exposto à internet sem camada de autenticação adicional.
+- modo local por padrao
+- sem autenticacao neste momento
+- nao expor na internet sem camada adicional
 
-## Dados sensíveis
+## Segredos
 
-- API keys são lidas apenas de variáveis de ambiente via `.env` — nunca commitadas
-- Logs passam por redaction automática: email, telefone, chaves API (padrões `sk-*`, `sk-ant-*`)
-- Stacktraces brutos não são exibidos na UI — apenas tipo e mensagem sanitizada
-- Erros de modelo são separados de erros de avaliação
+- API keys ficam apenas em `.env`
+- `.env.example` nao contem segredos reais
+- logs aplicam redaction de email, telefone, token e padroes de chave
+- erros persistidos em `RunCaseResult.raw_error` passam por sanitizacao
 
-## Redaction de logs
+## Redaction basica
 
-Os seguintes padrões são removidos automaticamente dos logs:
+Padroes cobertos:
 
-```
-sk-[A-Za-z0-9]{20,}        → [REDACTED_API_KEY]
-sk-ant-[A-Za-z0-9]{20,}    → [REDACTED_API_KEY]
-email@dominio.com           → [REDACTED_EMAIL]
-"api_key": "..."            → "api_key": "[REDACTED]"
-"password": "..."           → "password": "[REDACTED]"
-"secret": "..."             → "secret": "[REDACTED]"
-"token": "..."              → "token": "[REDACTED]"
-```
+- `sk-*`
+- `sk-ant-*`
+- email
+- telefone
+- `api_key`, `password`, `secret`, `token` em JSON
 
-## Variáveis de ambiente
+## Separacao de falhas
 
-Nunca inclua chaves reais no `.env.example`. Apenas `.env` deve conter segredos e deve estar no `.gitignore`.
+- erro de modelo: salvo em `raw_error`
+- erro de avaliacao: salvo como `MetricScore` com status `FAILED`
+- metricas indisponiveis: `SKIPPED` com motivo explicito
 
-## SQL Injection
+## Safety suite
 
-Todas as queries usam SQLModel/SQLAlchemy com parâmetros vinculados — sem SQL dinâmico.
+Cobertura inicial:
 
-## Preparação para produção
+- prompt injection direta
+- tentativa de ignorar instrucoes
+- extracao de system prompt
+- bypass de policy
+- refusal quality
+- leakage basico de PII/segredo
 
-Para usar em ambiente compartilhado:
-1. Adicionar autenticação (módulo preparado para inclusão futura)
-2. Configurar HTTPS
-3. Usar banco Postgres (troca de `DATABASE_URL` apenas)
-4. Revisar os padrões de redaction para o contexto do domínio
-5. Adicionar rate limiting nas rotas de execução
+## Riscos residuais
 
-## Considerações PII
+- regex nao detecta todos os vazamentos nem todos os ataques indiretos
+- sem autenticacao qualquer usuario local pode operar o laboratorio
+- datasets com PII real continuam sendo responsabilidade do operador
 
-Por padrão, o laboratório não captura PII. Se os datasets de teste contiverem dados pessoais:
-- Use dados sintéticos sempre que possível
-- Habilite redaction adicional nas configurações
-- Não use em produção sem revisão de conformidade (LGPD/GDPR)
+## Recomendacoes para um proximo passo
+
+1. adicionar autenticacao
+2. separar ambientes de dev e avaliacao compartilhada
+3. ampliar redaction por dominio
+4. adicionar rate limiting em rotas de execucao
+5. revisar armazenamento de traces e retencao de dados

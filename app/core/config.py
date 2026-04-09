@@ -14,13 +14,17 @@ class Settings(BaseSettings):
     # Provider padrão
     default_provider: str = "mock"
     openai_api_key: str = ""
+    openai_base_url: str = ""
     openai_default_model: str = "gpt-4o-mini"
     anthropic_api_key: str = ""
     anthropic_default_model: str = "claude-3-5-haiku-20241022"
+    ollama_base_url: str = "http://127.0.0.1:11434/v1"
+    ollama_default_model: str = "gpt-oss:20b"
 
     # Judge
     judge_provider: str = "mock"
     judge_model: str = "mock"
+    judge_rubric_default: str = "balanced"
 
     # Banco
     database_url: str = "sqlite:///./data/aievals.db"

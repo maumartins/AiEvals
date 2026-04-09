@@ -4,6 +4,7 @@ import pytest
 
 from app.services.llm.base import LLMRequest
 from app.services.llm.mock_provider import MockProvider
+from app.services.llm.registry import AVAILABLE_PROVIDERS, get_provider
 
 
 @pytest.fixture
@@ -59,3 +60,8 @@ class TestMockProvider:
 
     def test_provider_name(self, provider):
         assert provider.name == "mock"
+
+    def test_registry_exposes_ollama(self):
+        assert "ollama" in AVAILABLE_PROVIDERS
+        ollama = get_provider("ollama")
+        assert ollama.name == "ollama"

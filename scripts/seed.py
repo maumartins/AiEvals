@@ -1,18 +1,49 @@
-"""Seed data obrigatório: datasets de exemplo para o MVP."""
+"""Seed data obrigatorio: datasets de exemplo para o MVP."""
 
 import json
 
 from sqlmodel import Session
 
+from app.models.entities import PromptTemplate
 from app.services.datasets import create_case, create_dataset
 
 
 def run_seed(session: Session) -> None:
     """Cria todos os datasets e casos de exemplo."""
+    _seed_prompt_templates(session)
     _seed_general_qa(session)
     _seed_rag_qa(session)
     _seed_extraction(session)
     _seed_safety(session)
+
+
+def _seed_prompt_templates(session: Session) -> None:
+    templates = [
+        PromptTemplate(
+            name="Baseline Assistant",
+            version="1.0",
+            description="Prompt baseline simples para perguntas gerais.",
+            system_template="Voce e um assistente tecnico objetivo. Responda sem inventar fatos.",
+            user_template="{{user_input}}",
+        ),
+        PromptTemplate(
+            name="Grounded QA",
+            version="1.1",
+            description="Prompt para cenarios com contexto recuperado e foco em grounding.",
+            system_template="Responda apenas com base no contexto fornecido. Se faltar evidencia, diga claramente.",
+            user_template="Pergunta: {{user_input}}\n\nContexto recuperado:\n{{retrieved_context}}",
+        ),
+        PromptTemplate(
+            name="Structured Extraction",
+            version="1.0",
+            description="Prompt para extracao estruturada em JSON.",
+            system_template="Extraia apenas o que foi pedido e devolva JSON valido.",
+            user_template="{{user_input}}",
+        ),
+    ]
+    for template in templates:
+        session.add(template)
+    session.commit()
 
 
 def _seed_general_qa(session: Session) -> None:
@@ -148,6 +179,10 @@ def _seed_extraction(session: Session) -> None:
             "name": "Extração de entidades NLP",
             "user_input": 'Extraia as entidades do texto abaixo em JSON com campos "pessoa", "local", "data": "João Silva nasceu em São Paulo em 15 de março de 1985."',
             "expected_answer": '{"pessoa": "João Silva", "local": "São Paulo", "data": "15 de março de 1985"}',
+            "metadata_json": {
+                "response_format": "json",
+                "regex_must_match": ['"pessoa"\\s*:', '"local"\\s*:', '"data"\\s*:'],
+            },
             "scenario_type": "extraction",
             "severity": "low",
             "category": "nlp",
@@ -157,6 +192,10 @@ def _seed_extraction(session: Session) -> None:
             "name": "Extração de produto",
             "user_input": 'Extraia em JSON: "Notebook Dell Inspiron 15, 16GB RAM, SSD 512GB, i7 12ª geração, R$ 4.299,00"',
             "expected_answer": '{"produto": "Notebook Dell Inspiron 15", "ram": "16GB", "armazenamento": "SSD 512GB", "processador": "i7 12ª geração", "preco": "R$ 4.299,00"}',
+            "metadata_json": {
+                "response_format": "json",
+                "required_keywords": ["produto", "ram", "armazenamento", "processador"],
+            },
             "scenario_type": "extraction",
             "severity": "low",
             "category": "e-commerce",
@@ -166,6 +205,10 @@ def _seed_extraction(session: Session) -> None:
             "name": "Extração de dados de contato",
             "user_input": 'Extraia dados de contato em JSON: "Entre em contato com Maria Santos, gerente de projetos, email: maria@empresa.com.br, ramal 4521."',
             "expected_answer": '{"nome": "Maria Santos", "cargo": "gerente de projetos", "email": "maria@empresa.com.br", "ramal": "4521"}',
+            "metadata_json": {
+                "response_format": "json",
+                "regex_must_match": ['"email"\\s*:', '"ramal"\\s*:'],
+            },
             "scenario_type": "extraction",
             "severity": "medium",
             "category": "contato",

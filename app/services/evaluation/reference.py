@@ -42,12 +42,19 @@ def compute_reference_metrics(case: TestCase, result: RunCaseResult) -> list[dic
 
     if not case.expected_answer:
         skip_msg = "Nenhum expected_answer definido para este caso"
-        for name in ["semantic_similarity", "topic_coverage", "critical_divergence", "lexical_overlap"]:
+        for name in [
+            "semantic_similarity",
+            "factual_correctness",
+            "topic_coverage",
+            "critical_divergence",
+            "lexical_overlap",
+        ]:
             metrics.append(_skipped(name, skip_msg))
         return metrics
 
     response = result.response or ""
     expected = case.expected_answer
+    reference_text = case.reference_context or case.expected_answer
 
     # 1. Similaridade semântica com embeddings
     if _ST_AVAILABLE:
@@ -68,11 +75,15 @@ def compute_reference_metrics(case: TestCase, result: RunCaseResult) -> list[dic
     lex_sim = _lexical_similarity(response, expected)
     metrics.append(_metric("lexical_overlap", round(lex_sim, 4)))
 
-    # 3. Cobertura de tópicos por checklist simples
+    # 3. Factual correctness aproximada contra a referência
+    fact_score = _factual_correctness(response, reference_text)
+    metrics.append(_metric("factual_correctness", round(fact_score, 4)))
+
+    # 4. Cobertura de tópicos por checklist simples
     topic_score = _topic_coverage(response, expected)
     metrics.append(_metric("topic_coverage", round(topic_score, 4)))
 
-    # 4. Divergência crítica (flag booleana → 0 = diverge, 1 = OK)
+    # 5. Divergência crítica (flag booleana → 0 = diverge, 1 = OK)
     diverges = _detect_critical_divergence(response, expected)
     metrics.append(_metric(
         "critical_divergence",
@@ -140,3 +151,24 @@ def _detect_critical_divergence(response: str, expected: str) -> bool:
         if re.search(neg, expected_lower) and re.search(pos, response_lower):
             return True
     return False
+
+
+def _factual_correctness(response: str, reference: str) -> float:
+    response_lower = response.lower()
+    reference_lower = reference.lower()
+    response_numbers = re.findall(r"\d+(?:[.,]\d+)?", response_lower)
+    reference_numbers = re.findall(r"\d+(?:[.,]\d+)?", reference_lower)
+
+    lexical = _lexical_similarity(response, reference)
+    topic = _topic_coverage(response, reference)
+    number_score = 1.0
+    if reference_numbers:
+        matched = sum(1 for number in reference_numbers if number in response_numbers)
+        number_score = matched / len(reference_numbers)
+
+    contradiction_penalty = 0.0
+    if _detect_critical_divergence(response, reference):
+        contradiction_penalty = 0.5
+
+    score = (lexical * 0.35) + (topic * 0.4) + (number_score * 0.25) - contradiction_penalty
+    return max(0.0, min(1.0, score))

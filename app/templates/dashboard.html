@@ -1,46 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — AI Quality Lab{% endblock %}
+{% block title %}Painel{% endblock %}
 {% block content %}
 <div class="mb-8">
-  <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
-  <p class="mt-1 text-gray-500">Visão geral do laboratório de qualidade de IA</p>
+  <h1 class="text-3xl font-bold text-gray-900">Painel</h1>
+  <p class="mt-1 text-gray-500">Visão geral do laboratório de qualidade de respostas de IA.</p>
 </div>
 
-<!-- Cards de resumo -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
   <div class="card text-center">
-    <div class="text-3xl font-bold text-indigo-600">{{ total_datasets }}</div>
+    <div class="text-3xl font-bold text-teal-700">{{ total_datasets }}</div>
     <div class="text-sm text-gray-500 mt-1">Datasets</div>
   </div>
   <div class="card text-center">
-    <div class="text-3xl font-bold text-indigo-600">{{ total_cases }}</div>
-    <div class="text-sm text-gray-500 mt-1">Casos de Teste</div>
+    <div class="text-3xl font-bold text-teal-700">{{ total_cases }}</div>
+    <div class="text-sm text-gray-500 mt-1">Casos de teste</div>
   </div>
   <div class="card text-center">
-    <div class="text-3xl font-bold text-indigo-600">{{ total_runs }}</div>
+    <div class="text-3xl font-bold text-teal-700">{{ total_runs }}</div>
     <div class="text-sm text-gray-500 mt-1">Experimentos</div>
     <div class="text-xs mt-1">
-      <span class="text-green-600">{{ completed_runs }} ok</span>
-      {% if failed_runs > 0 %} · <span class="text-red-500">{{ failed_runs }} falha</span>{% endif %}
+      <span class="text-green-600">{{ completed_runs }} concluídos</span>
+      {% if failed_runs > 0 %} · <span class="text-red-500">{{ failed_runs }} com falha</span>{% endif %}
     </div>
   </div>
   <div class="card text-center">
     <div class="text-xl font-bold text-gray-700">{{ avg_latency_ms | ms if avg_latency_ms else "—" }}</div>
-    <div class="text-sm text-gray-500 mt-1">Latência Média</div>
+    <div class="text-sm text-gray-500 mt-1">Latência média</div>
     <div class="text-xs text-gray-400">{{ avg_cost_usd | usd if avg_cost_usd is not none else "—" }} custo médio</div>
   </div>
 </div>
 
-<!-- Métricas por modelo -->
 {% if model_summary %}
 <div class="card mb-8">
-  <h2 class="text-lg font-semibold text-gray-900 mb-4">Score Composto por Modelo</h2>
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Score composto por modelo</h2>
   <div class="overflow-x-auto">
     <table class="min-w-full text-sm">
       <thead>
         <tr class="border-b border-gray-200">
           <th class="text-left py-2 pr-4 font-medium text-gray-700">Modelo</th>
-          <th class="text-right py-2 font-medium text-gray-700">Score Composto (média)</th>
+          <th class="text-right py-2 font-medium text-gray-700">Score composto (média)</th>
         </tr>
       </thead>
       <tbody>
@@ -49,7 +47,7 @@
           <td class="py-2 pr-4 font-mono text-gray-700">{{ model }}</td>
           <td class="py-2 text-right">
             {% if metrics.composite_score is not none %}
-            <span class="{{ metrics.composite_score | metric_color }}">{{ metrics.composite_score | ff(3) }}</span>
+            <span class="{{ metric_value_class(metrics.composite_score, 'composite_score') }}">{{ metric_display_value('composite_score', metrics.composite_score) }}</span>
             {% else %}—{% endif %}
           </td>
         </tr>
@@ -60,11 +58,26 @@
 </div>
 {% endif %}
 
-<!-- Runs recentes -->
+{% if prompt_version_summary %}
+<div class="card mb-8">
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Comparativo por versão de prompt</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    {% for prompt_version, score in prompt_version_summary.items() %}
+    <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+      <div class="text-xs uppercase tracking-wide text-slate-500 mb-1">Versão do prompt</div>
+      <div class="font-mono text-sm text-slate-700">{{ prompt_version }}</div>
+      <div class="mt-2 text-xl {{ metric_value_class(score, 'composite_score') }}">{{ metric_display_value('composite_score', score) }}</div>
+      <div class="text-xs text-slate-400">Média do score composto</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="flex items-center justify-between mb-4">
-    <h2 class="text-lg font-semibold text-gray-900">Experimentos Recentes</h2>
-    <a href="/runs/new" class="btn-primary text-sm">+ Novo Experimento</a>
+    <h2 class="text-lg font-semibold text-gray-900">Experimentos recentes</h2>
+    <a href="/runs/new" class="btn-primary text-sm">Novo experimento</a>
   </div>
   {% if recent_runs %}
   <div class="overflow-x-auto">
@@ -75,22 +88,22 @@
           <th class="py-2 pr-4 font-medium text-gray-700">Dataset</th>
           <th class="py-2 pr-4 font-medium text-gray-700">Modelo</th>
           <th class="py-2 pr-4 font-medium text-gray-700">Status</th>
-          <th class="py-2 font-medium text-gray-700">Data</th>
+          <th class="py-2 font-medium text-gray-700">Criado em</th>
         </tr>
       </thead>
       <tbody>
         {% for run in recent_runs %}
         <tr class="border-b border-gray-100 hover:bg-gray-50">
           <td class="py-2 pr-4">
-            <a href="/runs/{{ run.id }}" class="text-indigo-600 hover:text-indigo-800 font-medium">{{ run.name or "Run #" ~ run.id }}</a>
+            <a href="/runs/{{ run.id }}" class="text-teal-700 hover:text-teal-900 font-medium">{{ run.name or "Experimento #" ~ run.id }}</a>
           </td>
           <td class="py-2 pr-4 text-gray-600">{{ run._dataset.name if run._dataset else "—" }}</td>
           <td class="py-2 pr-4 font-mono text-gray-600 text-xs">{{ run.model }}</td>
           <td class="py-2 pr-4">
-            {% if run.status.value == "completed" %}<span class="badge-green">✓ Concluído</span>
-            {% elif run.status.value == "running" %}<span class="badge-yellow">⏳ Executando</span>
-            {% elif run.status.value == "failed" %}<span class="badge-red">✗ Falhou</span>
-            {% else %}<span class="badge-gray">Pendente</span>{% endif %}
+            {% if run.status.value == "completed" %}<span class="badge-green">{{ status_label(run.status.value) }}</span>
+            {% elif run.status.value == "running" %}<span class="badge-yellow">{{ status_label(run.status.value) }}</span>
+            {% elif run.status.value == "failed" %}<span class="badge-red">{{ status_label(run.status.value) }}</span>
+            {% else %}<span class="badge-gray">{{ status_label(run.status.value) }}</span>{% endif %}
           </td>
           <td class="py-2 text-gray-400 text-xs">{{ run.created_at.strftime('%d/%m %H:%M') }}</td>
         </tr>
@@ -100,8 +113,7 @@
   </div>
   {% else %}
   <div class="text-center py-12 text-gray-400">
-    <div class="text-4xl mb-3">🧪</div>
-    <p>Nenhum experimento ainda.</p>
+    <p>Nenhum experimento cadastrado ainda.</p>
     <a href="/runs/new" class="mt-4 inline-block btn-primary">Criar primeiro experimento</a>
   </div>
   {% endif %}

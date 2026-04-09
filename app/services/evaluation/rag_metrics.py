@@ -52,37 +52,42 @@ async def compute_rag_metrics(case: TestCase, result: RunCaseResult) -> list[dic
     context = case.retrieved_context
     question = case.user_input
 
-    if _RAGAS_AVAILABLE and case.expected_answer:
+    if _RAGAS_AVAILABLE:
         try:
-            ragas_metrics = await _compute_ragas(question, response, context, case.expected_answer)
+            ragas_metrics = await _compute_ragas(
+                question,
+                response,
+                context,
+                case.expected_answer,
+            )
             metrics.extend(ragas_metrics)
         except Exception as e:
             logger.warning(f"Ragas falhou, usando fallback léxico: {e}")
             metrics.extend(_compute_lexical_rag(question, response, context, case.expected_answer))
     else:
-        if _RAGAS_AVAILABLE and not case.expected_answer:
-            skip_msg = "Ragas context_recall requer expected_answer; usando fallback parcial"
-        else:
-            skip_msg = "Ragas não instalado; usando métricas léxicas de fallback"
         metrics.extend(_compute_lexical_rag(question, response, context, case.expected_answer))
 
     return metrics
 
 
 async def _compute_ragas(
-    question: str, answer: str, context: str, ground_truth: str
+    question: str,
+    answer: str,
+    context: str,
+    ground_truth: Optional[str],
 ) -> list[dict]:
     """Tenta calcular métricas com Ragas."""
-    dataset = HFDataset.from_dict({
+    data = {
         "question": [question],
         "answer": [answer],
         "contexts": [[context]],
-        "ground_truth": [ground_truth],
-    })
-    result = evaluate(
-        dataset,
-        metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
-    )
+    }
+    selected_metrics = [faithfulness, answer_relevancy, context_precision]
+    if ground_truth:
+        data["ground_truth"] = [ground_truth]
+        selected_metrics.append(context_recall)
+    dataset = HFDataset.from_dict(data)
+    result = evaluate(dataset, metrics=selected_metrics)
     df = result.to_pandas()
     row = df.iloc[0]
     metrics = []
@@ -93,11 +98,21 @@ async def _compute_ragas(
         "context_recall": "context_recall",
     }
     for ragas_name, metric_name in mapping.items():
+        if ragas_name == "context_recall" and not ground_truth:
+            metrics.append(_skipped(metric_name, "Requer expected_answer para calcular context_recall"))
+            continue
         val = row.get(ragas_name)
         if val is not None and not (isinstance(val, float) and str(val) == "nan"):
             metrics.append(_metric(metric_name, round(float(val), 4), {"source": "ragas"}))
         else:
             metrics.append(_skipped(metric_name, "Ragas retornou NaN para esta métrica"))
+    metrics.append(
+        _metric(
+            "groundedness",
+            round(_groundedness(answer, context), 4),
+            {"source": "lexical-equivalent"},
+        )
+    )
     return metrics
 
 
