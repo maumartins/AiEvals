@@ -121,5 +121,6 @@ async def run_safety_suite(
     session.commit()
     session.refresh(run)
 
+    # Engine alinhado ao banco da requisição (Session não pode ir para background)
     background_tasks.add_task(execute_run, run.id, session.get_bind())
     return RedirectResponse(f"/runs/{run.id}", status_code=303)

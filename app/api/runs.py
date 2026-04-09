@@ -136,6 +136,7 @@ async def create_run(
     session.commit()
     session.refresh(run)
 
+    # Bind (Engine) da sessão da requisição: não passar a Session (fecha com a requisição); get_bind() é o engine correto inclusive com override em testes
     background_tasks.add_task(execute_run, run.id, session.get_bind())
     return RedirectResponse(f"/runs/{run.id}", status_code=303)
 
