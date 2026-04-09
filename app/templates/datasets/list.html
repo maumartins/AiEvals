@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Datasets — AI Quality Lab{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-3xl font-bold text-gray-900">Datasets</h1>
+    <p class="text-gray-500 mt-1">Gerencie conjuntos de casos de teste</p>
+  </div>
+  <a href="/datasets/new" class="btn-primary">+ Novo Dataset</a>
+</div>
+
+{% if datasets %}
+<div class="grid gap-4">
+  {% for ds in datasets %}
+  <div class="card flex items-center justify-between">
+    <div>
+      <a href="/datasets/{{ ds.id }}" class="text-xl font-semibold text-indigo-600 hover:text-indigo-800">{{ ds.name }}</a>
+      {% if ds.category %}<span class="ml-2 badge-blue">{{ ds.category }}</span>{% endif %}
+      {% if ds.description %}<p class="text-gray-500 text-sm mt-1">{{ ds.description }}</p>{% endif %}
+      <p class="text-gray-400 text-xs mt-1">Criado em {{ ds.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/datasets/{{ ds.id }}" class="btn-secondary text-sm">Ver casos</a>
+      <form action="/datasets/{{ ds.id }}/delete" method="post" onsubmit="return confirm('Remover dataset e todos os casos?')">
+        <button class="btn-danger text-sm">Remover</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center py-16">
+  <div class="text-5xl mb-4">📦</div>
+  <p class="text-gray-500 text-lg">Nenhum dataset ainda.</p>
+  <a href="/datasets/new" class="mt-6 inline-block btn-primary">Criar primeiro dataset</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}{{ run.name or "Run #" ~ run.id }} — Experimento{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <a href="/runs/" class="text-indigo-600 hover:text-indigo-800 text-sm">← Experimentos</a>
+  <div class="flex items-center justify-between mt-2">
+    <h1 class="text-3xl font-bold text-gray-900">{{ run.name or "Run #" ~ run.id }}</h1>
+    {% if run.status.value == "completed" %}<span class="badge-green text-base px-3 py-1">✓ Concluído</span>
+    {% elif run.status.value == "running" %}
+    <span class="badge-yellow text-base px-3 py-1" id="status-badge"
+      hx-get="/runs/{{ run.id }}/status"
+      hx-trigger="every 3s"
+      hx-swap="outerHTML">⏳ Executando…</span>
+    {% elif run.status.value == "failed" %}<span class="badge-red text-base px-3 py-1">✗ Falhou</span>
+    {% else %}<span class="badge-gray text-base px-3 py-1">Pendente</span>{% endif %}
+  </div>
+</div>
+
+<!-- Metadados do run -->
+<div class="card mb-6">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+    <div><span class="text-gray-500">Dataset:</span> <strong>{{ dataset.name if dataset else run.dataset_id }}</strong></div>
+    <div><span class="text-gray-500">Provider/Modelo:</span> <strong class="font-mono">{{ run.provider }}/{{ run.model }}</strong></div>
+    <div><span class="text-gray-500">Temperature:</span> <strong>{{ run.temperature }}</strong></div>
+    <div><span class="text-gray-500">Preset:</span> <strong>{{ run.scoring_preset.value }}</strong></div>
+    <div><span class="text-gray-500">Casos:</span> <strong>{{ results | length }}</strong></div>
+    <div><span class="text-gray-500">Iniciado:</span> <strong>{{ run.started_at.strftime('%d/%m %H:%M') if run.started_at else '—' }}</strong></div>
+    <div><span class="text-gray-500">Concluído:</span> <strong>{{ run.completed_at.strftime('%d/%m %H:%M') if run.completed_at else '—' }}</strong></div>
+  </div>
+</div>
+
+{% if results %}
+<!-- Resumo de métricas -->
+{% set completed_results = results | selectattr("result.status.value", "eq", "completed") | list %}
+{% if completed_results %}
+<div class="card mb-6">
+  <h2 class="text-lg font-semibold text-gray-900 mb-3">Resumo por Família de Métricas</h2>
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm text-center">
+    {% set families = ["deterministic", "reference", "rag", "composite"] %}
+    {% for family in families %}
+    <div class="bg-gray-50 rounded-lg p-3">
+      <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">{{ family }}</div>
+      {% set all_vals = [] %}
+      {% for item in completed_results %}
+        {% for m in item.metrics %}
+          {% if m.metric_family == family and m.value is not none %}
+            {% set _ = all_vals.append(m.value) %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+      {% if all_vals %}
+      <div class="{{ (all_vals | sum / all_vals | length) | metric_color }}">
+        {{ "%.3f" | format(all_vals | sum / all_vals | length) }}
+      </div>
+      <div class="text-xs text-gray-400">{{ all_vals | length }} métrica(s)</div>
+      {% else %}
+      <div class="text-gray-400">—</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <div class="bg-indigo-50 rounded-lg p-3">
+      <div class="text-xs text-indigo-600 uppercase tracking-wide mb-1">Judge Avg</div>
+      {% set judge_scores = [] %}
+      {% for item in completed_results %}
+        {% if item.judge %}
+          {% for field in ["correctness", "completeness", "clarity", "helpfulness", "safety"] %}
+            {% set val = item.judge | attr(field) %}
+            {% if val is not none %}{% set _ = judge_scores.append(val) %}{% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+      {% if judge_scores %}
+      <div class="{{ (judge_scores | sum / judge_scores | length / 5) | metric_color }}">
+        {{ "%.1f" | format(judge_scores | sum / judge_scores | length) }}/5
+      </div>
+      {% else %}<div class="text-gray-400">—</div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Resultados por caso -->
+<div class="space-y-4">
+  {% for item in results %}
+  {% set result = item.result %}
+  {% set case = item.test_case %}
+  {% set metrics = item.metrics %}
+  {% set judge = item.judge %}
+
+  <div class="card">
+    <div class="flex items-start justify-between mb-3">
+      <div class="flex-1">
+        <div class="flex items-center gap-2 mb-1">
+          {% if case %}
+          <span class="font-medium text-gray-900">{{ case.name or "Caso #" ~ case.id }}</span>
+          <span class="badge-blue text-xs">{{ case.scenario_type.value }}</span>
+          <span class="badge-{{ 'red' if case.severity.value == 'high' else ('yellow' if case.severity.value == 'medium' else 'gray') }} text-xs">{{ case.severity.value }}</span>
+          {% endif %}
+          {% if result.status.value == "completed" %}<span class="badge-green text-xs">✓</span>
+          {% elif result.status.value == "failed" %}<span class="badge-red text-xs">✗ Falhou</span>{% endif %}
+        </div>
+        <div class="flex gap-4 text-xs text-gray-500">
+          {% if result.latency_ms %}<span>⏱ {{ result.latency_ms | ms }}</span>{% endif %}
+          {% if result.cost_usd is not none %}<span>💰 {{ result.cost_usd | usd }}</span>{% endif %}
+          {% if result.tokens_input %}<span>🔢 {{ result.tokens_input }}→{{ result.tokens_output or "?" }} tokens</span>{% endif %}
+          <span class="font-mono text-gray-300" title="trace_id">{{ result.trace_id[:8] }}…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input / Output -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Input</div>
+        <div class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 max-h-32 overflow-y-auto">{{ result.final_prompt or (case.user_input if case else "—") }}</div>
+        {% if case and case.retrieved_context %}
+        <div class="text-xs font-medium text-gray-500 mb-1 mt-2 uppercase tracking-wide">Contexto RAG</div>
+        <div class="bg-blue-50 rounded-lg p-3 text-xs text-gray-700 max-h-20 overflow-y-auto">{{ case.retrieved_context[:300] }}{% if case.retrieved_context | length > 300 %}…{% endif %}</div>
+        {% endif %}
+      </div>
+      <div>
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Resposta</div>
+        {% if result.raw_error %}
+        <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">⚠ Erro: {{ result.raw_error }}</div>
+        {% elif result.response %}
+        <div class="bg-green-50 rounded-lg p-3 text-sm text-gray-700 max-h-32 overflow-y-auto">{{ result.response }}</div>
+        {% else %}
+        <div class="text-gray-400 text-sm">Sem resposta</div>
+        {% endif %}
+        {% if case and case.expected_answer %}
+        <div class="text-xs font-medium text-gray-500 mb-1 mt-2 uppercase tracking-wide">Esperado</div>
+        <div class="bg-yellow-50 rounded-lg p-3 text-xs text-gray-700 max-h-20 overflow-y-auto">{{ case.expected_answer }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Métricas -->
+    {% if metrics %}
+    <details>
+      <summary class="text-xs font-medium text-gray-600 cursor-pointer mb-2 hover:text-indigo-600">
+        Ver {{ metrics | length }} métrica(s) ▾
+      </summary>
+      <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        {% for m in metrics %}
+        <div class="bg-gray-50 rounded p-2">
+          <div class="text-gray-500 truncate" title="{{ m.metric_name }}">{{ m.metric_name }}</div>
+          {% if m.status.value == "computed" %}
+          <div class="{{ m.value | metric_color if m.value is not none else 'text-gray-400' }}">
+            {% if m.value is not none %}{{ "%.4f" | format(m.value) }}{% else %}null{% endif %}
+          </div>
+          {% elif m.status.value == "skipped" %}
+          <div class="text-gray-400 italic" title="{{ m.skip_reason }}">SKIP</div>
+          {% else %}
+          <div class="text-red-400">FAIL</div>
+          {% endif %}
+          <div class="text-gray-300">{{ m.metric_family }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    <!-- Judge -->
+    {% if judge %}
+    <details>
+      <summary class="text-xs font-medium text-indigo-600 cursor-pointer mt-2 hover:text-indigo-800">
+        Ver avaliação do Judge ({{ judge.judge_provider }}/{{ judge.judge_model }}) ▾
+      </summary>
+      <div class="mt-2 bg-indigo-50 rounded-lg p-3">
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-2 text-xs text-center mb-3">
+          {% for field, label in [("correctness","Correção"),("completeness","Completude"),("clarity","Clareza"),("helpfulness","Utilidade"),("safety","Segurança"),("instruction_following","Instrução")] %}
+          {% set val = judge | attr(field) %}
+          <div>
+            <div class="text-gray-500">{{ label }}</div>
+            <div class="{{ val | judge_color if val is not none else 'text-gray-400' }} text-lg font-bold">{{ val or "—" }}</div>
+            <div class="text-gray-400">/5</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% if judge.rationale %}
+        <div class="text-xs text-gray-600 italic border-t border-indigo-200 pt-2">{{ judge.rationale }}</div>
+        {% endif %}
+        <div class="text-xs text-gray-400 mt-2">⚠ O judge não é verdade absoluta. Use como referência qualitativa.</div>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center py-12 text-gray-400">
+  <div class="text-4xl mb-3">⏳</div>
+  <p>Aguardando execução dos casos…</p>
+</div>
+{% endif %}
+{% endblock %}

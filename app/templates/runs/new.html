@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Novo Experimento{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <a href="/runs/" class="text-indigo-600 hover:text-indigo-800 text-sm">← Voltar</a>
+  <h1 class="text-3xl font-bold text-gray-900 mt-2">Novo Experimento</h1>
+</div>
+
+<div class="card max-w-2xl">
+  <form action="/runs/" method="post" class="space-y-5">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Experimento</label>
+      <input type="text" name="name" placeholder="ex: GPT-4o-mini baseline" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Dataset *</label>
+      <select name="dataset_id" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+        {% for ds in datasets %}
+        <option value="{{ ds.id }}">{{ ds.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+        <select name="provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+          {% for p in providers %}
+          <option value="{{ p }}" {% if p == "mock" %}selected{% endif %}>{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Modelo</label>
+        <input type="text" name="model" value="mock" placeholder="ex: gpt-4o-mini" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Temperature</label>
+        <input type="number" name="temperature" value="0.0" min="0" max="2" step="0.1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Max Tokens</label>
+        <input type="number" name="max_tokens" value="1024" min="64" max="4096" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Scoring Preset</label>
+      <select name="scoring_preset" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+        {% for preset in presets %}
+        <option value="{{ preset }}">{{ preset.replace("_", " ").title() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if templates %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Prompt Template (opcional)</label>
+      <select name="prompt_template_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
+        <option value="">— Sem template (usa user_input direto) —</option>
+        {% for tpl in templates %}
+        <option value="{{ tpl.id }}">{{ tpl.name }} (v{{ tpl.version }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+      💡 O experimento será executado em background. Você será redirecionado para acompanhar o progresso.
+    </div>
+
+    <button type="submit" class="btn-primary w-full">Iniciar Experimento</button>
+  </form>
+</div>
+{% endblock %}

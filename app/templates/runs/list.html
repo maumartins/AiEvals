@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Experimentos — AI Quality Lab{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-3xl font-bold text-gray-900">Experimentos</h1>
+    <p class="text-gray-500 mt-1">Histórico de runs de avaliação</p>
+  </div>
+  <a href="/runs/new" class="btn-primary">+ Novo Experimento</a>
+</div>
+
+{% if runs %}
+<div class="card overflow-x-auto">
+  <table class="min-w-full text-sm">
+    <thead>
+      <tr class="border-b border-gray-200 text-left">
+        <th class="py-3 pr-4 font-medium text-gray-700">Nome</th>
+        <th class="py-3 pr-4 font-medium text-gray-700">Dataset</th>
+        <th class="py-3 pr-4 font-medium text-gray-700">Modelo</th>
+        <th class="py-3 pr-4 font-medium text-gray-700">Preset</th>
+        <th class="py-3 pr-4 font-medium text-gray-700">Status</th>
+        <th class="py-3 font-medium text-gray-700">Criado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr class="border-b border-gray-100 hover:bg-gray-50">
+        <td class="py-3 pr-4">
+          <a href="/runs/{{ run.id }}" class="text-indigo-600 hover:text-indigo-800 font-medium">{{ run.name or "Run #" ~ run.id }}</a>
+        </td>
+        <td class="py-3 pr-4 text-gray-600">{{ run._dataset.name if run._dataset else run.dataset_id }}</td>
+        <td class="py-3 pr-4 font-mono text-xs text-gray-600">{{ run.provider }}/{{ run.model }}</td>
+        <td class="py-3 pr-4"><span class="badge-blue">{{ run.scoring_preset.value }}</span></td>
+        <td class="py-3 pr-4">
+          {% if run.status.value == "completed" %}<span class="badge-green">✓ Concluído</span>
+          {% elif run.status.value == "running" %}<span class="badge-yellow">⏳ Executando</span>
+          {% elif run.status.value == "failed" %}<span class="badge-red">✗ Falhou</span>
+          {% else %}<span class="badge-gray">Pendente</span>{% endif %}
+        </td>
+        <td class="py-3 text-gray-400 text-xs">{{ run.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card text-center py-16">
+  <div class="text-5xl mb-4">🧪</div>
+  <p class="text-gray-500 text-lg">Nenhum experimento ainda.</p>
+  <a href="/runs/new" class="mt-6 inline-block btn-primary">Criar primeiro experimento</a>
+</div>
+{% endif %}
+{% endblock %}
